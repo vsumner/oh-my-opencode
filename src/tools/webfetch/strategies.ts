@@ -4,6 +4,7 @@ import TurndownService from "turndown"
 import * as cheerio from "cheerio"
 import type { Element } from "domhandler"
 import * as jq from "jq-wasm"
+import { MAX_JQ_SIZE, MAX_RAW_SIZE } from "./constants"
 
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -12,7 +13,7 @@ const turndown = new TurndownService({
 
 export function applyReadability(html: string, url: string): string {
   const dom = new JSDOM(html, { url })
-  const reader = new Readability(dom.window.document.cloneNode(true) as Document)
+  const reader = new Readability(dom.window.document.cloneNode(true) as any)
   const article = reader.parse()
 
   if (!article?.content) {
@@ -23,11 +24,14 @@ export function applyReadability(html: string, url: string): string {
 }
 
 export function applyRaw(content: string): string {
+  if (content.length > MAX_RAW_SIZE) {
+    return `Error: Content is too large for raw strategy (${content.length}B > ${MAX_RAW_SIZE}B). Try 'readability', 'grep', 'snapshot', or 'selector'.`
+  }
+
   return content
 }
 
 function truncateAroundMatch(line: string, pattern: RegExp, contextLength: number = 200): string {
-  // CRITICAL: Create fresh regex without 'g' flag - RegExp.exec with 'g' flag maintains lastIndex state
   const freshPattern = new RegExp(pattern.source, pattern.flags.replace("g", ""))
   const match = freshPattern.exec(line)
 
@@ -303,6 +307,10 @@ export function applySelector(html: string, selector: string): string {
 }
 
 export async function applyJq(content: string, query: string): Promise<string> {
+  if (content.length > MAX_JQ_SIZE) {
+    return `Error: Content is too large for jq strategy (${content.length}B > ${MAX_JQ_SIZE}B). Consider fetching a smaller endpoint or use another strategy.`
+  }
+
   try {
     JSON.parse(content)
   } catch {
