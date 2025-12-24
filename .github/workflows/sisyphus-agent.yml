@@ -46,11 +46,36 @@ jobs:
           echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
           gh auth status
 
+      # Install Bun
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       # Install OpenCode
       - name: Install OpenCode
         run: |
           curl -fsSL https://opencode.ai/install.sh | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Verify OpenCode installation
+      - name: Verify OpenCode
+        run: |
+          opencode --version
+
+      # Setup oh-my-opencode plugin
+      - name: Setup oh-my-opencode
+        run: |
+          mkdir -p ~/.config/opencode
+          cat > ~/.config/opencode/opencode.json << 'EOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "plugin": ["oh-my-opencode"]
+          }
+          EOF
+          cd ~/.config/opencode
+          bun add oh-my-opencode
+          cat opencode.json
 
       # Setup OpenCode auth
       - name: Setup OpenCode Auth
