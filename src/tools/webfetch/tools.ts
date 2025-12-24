@@ -1,6 +1,6 @@
 import { tool } from "@opencode-ai/plugin/tool"
-import { DEFAULT_STRATEGY, MAX_OUTPUT_SIZE, MAX_RAW_SIZE, TIMEOUT_MS } from "./constants"
-import { applyReadability, applyRaw, applyGrep, applySnapshot, applySelector, type GrepOptions } from "./strategies"
+import { DEFAULT_STRATEGY, MAX_OUTPUT_SIZE, TIMEOUT_MS } from "./constants"
+import { applyReadability, applyRaw, applyGrep, applySnapshot, applySelector, applyJq, type GrepOptions } from "./strategies"
 import type { CompactionStrategy } from "./types"
 
 function formatBytes(bytes: number): string {
@@ -35,14 +35,15 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<string>
 interface StrategyOptions extends GrepOptions {
   pattern?: string
   selector?: string
+  query?: string
 }
 
-function applyStrategy(
+async function applyStrategy(
   content: string,
   url: string,
   strategy: CompactionStrategy,
   options?: StrategyOptions
-): string {
+): Promise<string> {
   switch (strategy) {
     case "readability":
       return applyReadability(content, url)
@@ -60,6 +61,11 @@ function applyStrategy(
         return "Error: 'selector' is required for selector strategy"
       }
       return applySelector(content, options.selector)
+    case "jq":
+      if (!options?.query) {
+        return "Error: 'query' is required for jq strategy"
+      }
+      return await applyJq(content, options.query)
     default:
       return applyReadability(content, url)
   }
@@ -69,19 +75,21 @@ export const webfetch = tool({
   description:
     "Fetch and process web content with compaction strategies.\n\n" +
     "STRATEGY SELECTION GUIDE:\n" +
+    "- 'jq': Query JSON APIs with jq syntax. Best for REST APIs, npm registry, GitHub API.\n" +
     "- 'readability': Extracts article content as markdown. Best for blogs, news, documentation pages.\n" +
     "- 'snapshot': ARIA-like semantic tree of page structure. Best for understanding layout, forms, navigation.\n" +
     "- 'selector': Extract elements matching a CSS selector. Best when you know exact element to target.\n" +
     "- 'grep': Filter lines matching a pattern with optional before/after context (like grep -B/-A).\n" +
-    "- 'raw': No processing. Only for small responses (<100KB) when you need exact content.",
+    "- 'raw': No processing. Returns exact content (truncated to 500KB if larger).",
   args: {
     url: tool.schema.string().describe("The URL to fetch"),
     strategy: tool.schema
-      .enum(["readability", "snapshot", "selector", "grep", "raw"])
+      .enum(["readability", "snapshot", "selector", "grep", "jq", "raw"])
       .optional()
       .describe("Compaction strategy (default: raw)."),
     pattern: tool.schema.string().optional().describe("Regex pattern for grep strategy"),
     selector: tool.schema.string().optional().describe("CSS selector for selector strategy"),
+    query: tool.schema.string().optional().describe("jq query for JSON APIs (e.g., '.data.items[]', '.name')"),
     limit: tool.schema.number().optional().describe("Max lines to return for grep (default: 100)"),
     offset: tool.schema.number().optional().describe("Skip first N result lines for grep pagination"),
     before: tool.schema.number().optional().describe("Lines of context before each match (like grep -B)"),
@@ -95,22 +103,10 @@ export const webfetch = tool({
       const rawContent = await fetchWithTimeout(url, TIMEOUT_MS)
       const originalSize = rawContent.length
 
-      if (strategy === "raw" && originalSize > MAX_RAW_SIZE) {
-        return [
-          `Error: Response size (${formatBytes(originalSize)}) exceeds raw strategy limit (${formatBytes(MAX_RAW_SIZE)}).`,
-          "This will cause token overflow.",
-          "",
-          "Suggested alternatives:",
-          "- 'readability' for article content extraction",
-          "- 'snapshot' for page structure/layout analysis",
-          "- 'selector' to extract specific elements by CSS selector",
-          "- 'grep' to filter lines matching a pattern",
-        ].join("\n")
-      }
-
-      let result = applyStrategy(rawContent, url, strategy, {
+      let result = await applyStrategy(rawContent, url, strategy, {
         pattern: args.pattern,
         selector: args.selector,
+        query: args.query,
         limit: args.limit,
         offset: args.offset,
         before: args.before,

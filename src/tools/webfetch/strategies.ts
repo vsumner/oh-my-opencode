@@ -3,6 +3,7 @@ import { Readability } from "@mozilla/readability"
 import TurndownService from "turndown"
 import * as cheerio from "cheerio"
 import type { Element } from "domhandler"
+import * as jq from "jq-wasm"
 
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -299,4 +300,23 @@ export function applySelector(html: string, selector: string): string {
   })
 
   return `Selector: ${selector}\nMatches: ${elements.length}\n---\n${results.join("\n\n")}`
+}
+
+export async function applyJq(content: string, query: string): Promise<string> {
+  try {
+    JSON.parse(content)
+  } catch {
+    return "Error: Content is not valid JSON. Use 'jq' strategy only for JSON APIs."
+  }
+
+  try {
+    const result = await jq.raw(content, query)
+    if (result.exitCode !== 0) {
+      return `Error: jq query failed: ${result.stderr}`
+    }
+    return result.stdout.trim()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return `Error: Invalid jq query: ${message}`
+  }
 }
