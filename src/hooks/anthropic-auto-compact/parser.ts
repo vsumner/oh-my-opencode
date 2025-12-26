@@ -1,4 +1,5 @@
 import type { ParsedTokenLimitError } from "./types"
+import { getModelMaxTokens } from "./model-registry"
 
 interface AnthropicErrorData {
   type: "error"
@@ -55,22 +56,32 @@ function isTokenLimitError(text: string): boolean {
   return TOKEN_LIMIT_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))
 }
 
-export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitError | null {
+export function parseAnthropicTokenLimitError(
+  err: unknown,
+  providerID?: string,
+  modelID?: string,
+): ParsedTokenLimitError | null {
   if (typeof err === "string") {
     if (err.toLowerCase().includes("non-empty content")) {
+      const fallbackMaxTokens = getModelMaxTokens(providerID, modelID) ?? 0
       return {
         currentTokens: 0,
-        maxTokens: 0,
+        maxTokens: fallbackMaxTokens,
         errorType: "non-empty content",
         messageIndex: extractMessageIndex(err),
+        providerID,
+        modelID,
       }
     }
     if (isTokenLimitError(err)) {
       const tokens = extractTokensFromMessage(err)
+      const fallbackMaxTokens = getModelMaxTokens(providerID, modelID) ?? 0
       return {
         currentTokens: tokens?.current ?? 0,
-        maxTokens: tokens?.max ?? 0,
+        maxTokens: tokens?.max ?? fallbackMaxTokens,
         errorType: "token_limit_exceeded_string",
+        providerID,
+        modelID,
       }
     }
     return null
@@ -133,6 +144,8 @@ export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitErr
                 maxTokens: tokens.max,
                 requestId: jsonData.request_id,
                 errorType: jsonData.error?.type || "token_limit_exceeded",
+                providerID,
+                modelID,
               }
             }
           } catch {}
@@ -141,10 +154,13 @@ export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitErr
 
       const bedrockJson = JSON.parse(responseBody)
       if (typeof bedrockJson.message === "string" && isTokenLimitError(bedrockJson.message)) {
+        const fallbackMaxTokens = getModelMaxTokens(providerID, modelID) ?? 0
         return {
           currentTokens: 0,
-          maxTokens: 0,
+          maxTokens: fallbackMaxTokens,
           errorType: "bedrock_input_too_long",
+          providerID,
+          modelID,
         }
       }
     } catch {}
@@ -157,24 +173,32 @@ export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitErr
         currentTokens: tokens.current,
         maxTokens: tokens.max,
         errorType: "token_limit_exceeded",
+        providerID,
+        modelID,
       }
     }
   }
 
   if (combinedText.toLowerCase().includes("non-empty content")) {
+    const fallbackMaxTokens = getModelMaxTokens(providerID, modelID) ?? 0
     return {
       currentTokens: 0,
-      maxTokens: 0,
+      maxTokens: fallbackMaxTokens,
       errorType: "non-empty content",
       messageIndex: extractMessageIndex(combinedText),
+      providerID,
+      modelID,
     }
   }
 
   if (isTokenLimitError(combinedText)) {
+    const fallbackMaxTokens = getModelMaxTokens(providerID, modelID) ?? 0
     return {
       currentTokens: 0,
-      maxTokens: 0,
+      maxTokens: fallbackMaxTokens,
       errorType: "token_limit_exceeded_unknown",
+      providerID,
+      modelID,
     }
   }
 

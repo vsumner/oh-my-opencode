@@ -47,7 +47,11 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: Anthr
       log("[auto-compact] session.error received", { sessionID, error: props?.error })
       if (!sessionID) return
 
-      const parsed = parseAnthropicTokenLimitError(props?.error)
+      const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
+      const providerID = (lastAssistant?.providerID as string | undefined)
+      const modelID = (lastAssistant?.modelID as string | undefined)
+      
+      const parsed = parseAnthropicTokenLimitError(props?.error, providerID, modelID)
       log("[auto-compact] parsed result", { parsed, hasError: !!props?.error })
       if (parsed) {
         autoCompactState.pendingCompact.add(sessionID)
@@ -57,9 +61,8 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: Anthr
           return
         }
 
-        const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
-        const providerID = parsed.providerID ?? (lastAssistant?.providerID as string | undefined)
-        const modelID = parsed.modelID ?? (lastAssistant?.modelID as string | undefined)
+        const finalProviderID = parsed.providerID ?? providerID
+        const finalModelID = parsed.modelID ?? modelID
 
         await ctx.client.tui
           .showToast({
@@ -75,7 +78,7 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: Anthr
         setTimeout(() => {
           executeCompact(
             sessionID,
-            { providerID, modelID },
+            { providerID: finalProviderID, modelID: finalModelID },
             autoCompactState,
             ctx.client,
             ctx.directory,
@@ -92,11 +95,11 @@ export function createAnthropicAutoCompactHook(ctx: PluginInput, options?: Anthr
 
       if (sessionID && info?.role === "assistant" && info.error) {
         log("[auto-compact] message.updated with error", { sessionID, error: info.error })
-        const parsed = parseAnthropicTokenLimitError(info.error)
+        const providerID = info.providerID as string | undefined
+        const modelID = info.modelID as string | undefined
+        const parsed = parseAnthropicTokenLimitError(info.error, providerID, modelID)
         log("[auto-compact] message.updated parsed result", { parsed })
         if (parsed) {
-          parsed.providerID = info.providerID as string | undefined
-          parsed.modelID = info.modelID as string | undefined
           autoCompactState.pendingCompact.add(sessionID)
           autoCompactState.errorDataBySession.set(sessionID, parsed)
         }
