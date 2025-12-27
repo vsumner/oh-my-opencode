@@ -3,6 +3,7 @@ import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log } from "../../shared/logger"
+import { toFileURL } from "../../shared/url-utils"
 
 function inferMimeType(filePath: string): string {
   const ext = extname(filePath).toLowerCase()
@@ -78,7 +79,7 @@ If the requested information is not found, clearly state what is missing.`
           },
           parts: [
             { type: "text", text: prompt },
-            { type: "file", mime: mimeType, url: `file://${args.file_path}`, filename },
+            { type: "file", mime: mimeType, url: toFileURL(args.file_path), filename },
           ],
         },
       })

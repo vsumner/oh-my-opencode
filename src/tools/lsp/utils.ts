@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "fs"
 import { LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
 import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
+import { fromFileURL } from "../../shared/url-utils"
 import type {
   HoverResult,
   DocumentSymbol,
@@ -94,13 +95,13 @@ export function formatHoverResult(result: HoverResult | null): string {
 
 export function formatLocation(loc: Location | LocationLink): string {
   if ("targetUri" in loc) {
-    const uri = loc.targetUri.replace("file://", "")
+    const uri = fromFileURL(loc.targetUri)
     const line = loc.targetRange.start.line + 1
     const char = loc.targetRange.start.character
     return `${uri}:${line}:${char}`
   }
 
-  const uri = loc.uri.replace("file://", "")
+  const uri = fromFileURL(loc.uri)
   const line = loc.range.start.line + 1
   const char = loc.range.start.character
   return `${uri}:${line}:${char}`
@@ -216,7 +217,7 @@ export function formatWorkspaceEdit(edit: WorkspaceEdit | null): string {
 
   if (edit.changes) {
     for (const [uri, edits] of Object.entries(edit.changes)) {
-      const filePath = uri.replace("file://", "")
+      const filePath = fromFileURL(uri)
       lines.push(`File: ${filePath}`)
       for (const textEdit of edits) {
         lines.push(formatTextEdit(textEdit))
@@ -235,7 +236,7 @@ export function formatWorkspaceEdit(edit: WorkspaceEdit | null): string {
           lines.push(`Delete: ${change.uri}`)
         }
       } else {
-        const filePath = change.textDocument.uri.replace("file://", "")
+        const filePath = fromFileURL(change.textDocument.uri)
         lines.push(`File: ${filePath}`)
         for (const textEdit of change.edits) {
           lines.push(formatTextEdit(textEdit))
@@ -333,7 +334,7 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
 
   if (edit.changes) {
     for (const [uri, edits] of Object.entries(edit.changes)) {
-      const filePath = uri.replace("file://", "")
+      const filePath = fromFileURL(uri)
       const applyResult = applyTextEditsToFile(filePath, edits)
 
       if (applyResult.success) {
@@ -351,7 +352,7 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
       if ("kind" in change) {
         if (change.kind === "create") {
           try {
-            const filePath = change.uri.replace("file://", "")
+            const filePath = fromFileURL(change.uri)
             writeFileSync(filePath, "", "utf-8")
             result.filesModified.push(filePath)
           } catch (err) {
@@ -360,8 +361,8 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
           }
         } else if (change.kind === "rename") {
           try {
-            const oldPath = change.oldUri.replace("file://", "")
-            const newPath = change.newUri.replace("file://", "")
+            const oldPath = fromFileURL(change.oldUri)
+            const newPath = fromFileURL(change.newUri)
             const content = readFileSync(oldPath, "utf-8")
             writeFileSync(newPath, content, "utf-8")
             require("fs").unlinkSync(oldPath)
@@ -372,7 +373,7 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
           }
         } else if (change.kind === "delete") {
           try {
-            const filePath = change.uri.replace("file://", "")
+            const filePath = fromFileURL(change.uri)
             require("fs").unlinkSync(filePath)
             result.filesModified.push(filePath)
           } catch (err) {
@@ -381,7 +382,7 @@ export function applyWorkspaceEdit(edit: WorkspaceEdit | null): ApplyResult {
           }
         }
       } else {
-        const filePath = change.textDocument.uri.replace("file://", "")
+        const filePath = fromFileURL(change.textDocument.uri)
         const applyResult = applyTextEditsToFile(filePath, change.edits)
 
         if (applyResult.success) {

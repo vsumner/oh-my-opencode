@@ -4,6 +4,7 @@ import { extname, resolve } from "path"
 import type { ResolvedServer } from "./config"
 import { getLanguageId } from "./config"
 import type { Diagnostic } from "./types"
+import { toFileURL } from "../../shared/url-utils"
 
 interface ManagedClient {
   client: LSPClient
@@ -408,7 +409,7 @@ export class LSPClient {
   }
 
   async initialize(): Promise<void> {
-    const rootUri = `file://${this.root}`
+    const rootUri = toFileURL(this.root)
     await this.send("initialize", {
       processId: process.pid,
       rootUri,
@@ -478,7 +479,7 @@ export class LSPClient {
 
     this.notify("textDocument/didOpen", {
       textDocument: {
-        uri: `file://${absPath}`,
+        uri: toFileURL(absPath),
         languageId,
         version: 1,
         text,
@@ -493,7 +494,7 @@ export class LSPClient {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/hover", {
-      textDocument: { uri: `file://${absPath}` },
+      textDocument: { uri: toFileURL(absPath) },
       position: { line: line - 1, character },
     })
   }
@@ -502,7 +503,7 @@ export class LSPClient {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/definition", {
-      textDocument: { uri: `file://${absPath}` },
+      textDocument: { uri: toFileURL(absPath) },
       position: { line: line - 1, character },
     })
   }
@@ -511,7 +512,7 @@ export class LSPClient {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/references", {
-      textDocument: { uri: `file://${absPath}` },
+      textDocument: { uri: toFileURL(absPath) },
       position: { line: line - 1, character },
       context: { includeDeclaration },
     })
@@ -521,7 +522,7 @@ export class LSPClient {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/documentSymbol", {
-      textDocument: { uri: `file://${absPath}` },
+      textDocument: { uri: toFileURL(absPath) },
     })
   }
 
@@ -531,7 +532,7 @@ export class LSPClient {
 
   async diagnostics(filePath: string): Promise<{ items: Diagnostic[] }> {
     const absPath = resolve(filePath)
-    const uri = `file://${absPath}`
+    const uri = toFileURL(absPath)
     await this.openFile(absPath)
     await new Promise((r) => setTimeout(r, 500))
 
@@ -552,7 +553,7 @@ export class LSPClient {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/prepareRename", {
-      textDocument: { uri: `file://${absPath}` },
+      textDocument: { uri: toFileURL(absPath) },
       position: { line: line - 1, character },
     })
   }
@@ -561,7 +562,7 @@ export class LSPClient {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/rename", {
-      textDocument: { uri: `file://${absPath}` },
+      textDocument: { uri: toFileURL(absPath) },
       position: { line: line - 1, character },
       newName,
     })
@@ -578,7 +579,7 @@ export class LSPClient {
     const absPath = resolve(filePath)
     await this.openFile(absPath)
     return this.send("textDocument/codeAction", {
-      textDocument: { uri: `file://${absPath}` },
+      textDocument: { uri: toFileURL(absPath) },
       range: {
         start: { line: startLine - 1, character: startChar },
         end: { line: endLine - 1, character: endChar },
