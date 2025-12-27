@@ -4,6 +4,7 @@ import { executeDeduplication } from "./pruning-deduplication"
 import { executeSupersedeWrites } from "./pruning-supersede"
 import { executePurgeErrors } from "./pruning-purge-errors"
 import { applyPruning } from "./pruning-storage"
+import { readMessages, countTurns, type TurnProtectionConfig } from "./pruning-utils"
 import { log } from "../../shared/logger"
 
 const DEFAULT_PROTECTED_TOOLS = new Set([
@@ -40,10 +41,19 @@ export async function executeDynamicContextPruning(
     ...(config.protected_tools || []),
   ])
   
+  const messages = readMessages(sessionID)
+  const currentTurn = countTurns(messages)
+  state.currentTurn = currentTurn
+  
+  const turnProtection: TurnProtectionConfig | undefined = config.turn_protection?.enabled
+    ? { enabled: true, turns: config.turn_protection.turns ?? 3 }
+    : undefined
+  
   log("[pruning-executor] starting DCP", {
     sessionID,
     notification: config.notification,
     turnProtection: config.turn_protection,
+    currentTurn,
   })
   
   let dedupCount = 0
@@ -55,7 +65,8 @@ export async function executeDynamicContextPruning(
       sessionID,
       state,
       { enabled: true },
-      protectedTools
+      protectedTools,
+      turnProtection
     )
   }
   
@@ -67,7 +78,8 @@ export async function executeDynamicContextPruning(
         enabled: true,
         aggressive: config.strategies?.supersede_writes?.aggressive || false,
       },
-      protectedTools
+      protectedTools,
+      turnProtection
     )
   }
   
@@ -79,7 +91,8 @@ export async function executeDynamicContextPruning(
         enabled: true,
         turns: config.strategies?.purge_errors?.turns || 5,
       },
-      protectedTools
+      protectedTools,
+      turnProtection
     )
   }
   

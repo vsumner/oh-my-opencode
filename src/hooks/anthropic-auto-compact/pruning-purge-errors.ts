@@ -1,7 +1,10 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
 import type { PruningState, ErroredToolCall } from "./pruning-types"
 import { estimateTokens } from "./pruning-types"
+import {
+  readMessages,
+  isToolProtectedByTurn,
+  type TurnProtectionConfig,
+} from "./pruning-utils"
 import { log } from "../../shared/logger"
 
 export interface PurgeErrorsConfig {
@@ -10,88 +13,17 @@ export interface PurgeErrorsConfig {
   protectedTools?: string[]
 }
 
-const MESSAGE_STORAGE = join(
-  process.env.HOME || process.env.USERPROFILE || "",
-  ".config",
-  "opencode",
-  "sessions"
-)
-
-interface ToolPart {
-  type: string
-  callID?: string
-  tool?: string
-  state?: {
-    input?: unknown
-    output?: string
-    status?: string
-  }
-}
-
-interface MessagePart {
-  type: string
-  parts?: ToolPart[]
-}
-
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
-}
-
-function readMessages(sessionID: string): MessagePart[] {
-  const messageDir = getMessageDir(sessionID)
-  if (!messageDir) return []
-
-  const messages: MessagePart[] = []
-  
-  try {
-    const files = readdirSync(messageDir).filter(f => f.endsWith(".json"))
-    for (const file of files) {
-      const content = readFileSync(join(messageDir, file), "utf-8")
-      const data = JSON.parse(content)
-      if (data.parts) {
-        messages.push(data)
-      }
-    }
-  } catch {
-    return []
-  }
-
-  return messages
-}
-
 export function executePurgeErrors(
   sessionID: string,
   state: PruningState,
   config: PurgeErrorsConfig,
-  protectedTools: Set<string>
+  protectedTools: Set<string>,
+  turnProtection?: TurnProtectionConfig
 ): number {
   if (!config.enabled) return 0
 
   const messages = readMessages(sessionID)
-  
-  let currentTurn = 0
-  
-  for (const msg of messages) {
-    if (!msg.parts) continue
-    
-    for (const part of msg.parts) {
-      if (part.type === "step-start") {
-        currentTurn++
-      }
-    }
-  }
-  
-  state.currentTurn = currentTurn
+  const maxTurn = state.currentTurn
   
   let turnCounter = 0
   let prunedCount = 0
@@ -116,7 +48,17 @@ export function executePurgeErrors(
       
       if (part.state?.status !== "error") continue
       
-      const turnAge = currentTurn - turnCounter
+      if (isToolProtectedByTurn(turnCounter, maxTurn, turnProtection)) {
+        log("[pruning-purge-errors] skipping protected turn", {
+          tool: part.tool,
+          callID: part.callID,
+          turn: turnCounter,
+          maxTurn,
+        })
+        continue
+      }
+      
+      const turnAge = maxTurn - turnCounter
       
       if (turnAge >= config.turns) {
         state.toolIdsToPrune.add(part.callID)
@@ -150,7 +92,7 @@ export function executePurgeErrors(
   log("[pruning-purge-errors] complete", {
     prunedCount,
     tokensSaved,
-    currentTurn,
+    currentTurn: maxTurn,
     threshold: config.turns,
   })
   

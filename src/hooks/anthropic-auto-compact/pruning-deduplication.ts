@@ -1,34 +1,16 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
 import type { PruningState, ToolCallSignature } from "./pruning-types"
 import { estimateTokens } from "./pruning-types"
+import {
+  readMessages,
+  isToolProtectedByTurn,
+  type TurnProtectionConfig,
+  type MessagePart,
+} from "./pruning-utils"
 import { log } from "../../shared/logger"
 
 export interface DeduplicationConfig {
   enabled: boolean
   protectedTools?: string[]
-}
-
-const MESSAGE_STORAGE = join(
-  process.env.HOME || process.env.USERPROFILE || "",
-  ".config",
-  "opencode",
-  "sessions"
-)
-
-interface ToolPart {
-  type: string
-  callID?: string
-  tool?: string
-  state?: {
-    input?: unknown
-    output?: string
-  }
-}
-
-interface MessagePart {
-  type: string
-  parts?: ToolPart[]
 }
 
 export function createToolSignature(toolName: string, input: unknown): string {
@@ -49,47 +31,12 @@ function sortObject(obj: unknown): unknown {
   return sorted
 }
 
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
-}
-
-function readMessages(sessionID: string): MessagePart[] {
-  const messageDir = getMessageDir(sessionID)
-  if (!messageDir) return []
-
-  const messages: MessagePart[] = []
-  
-  try {
-    const files = readdirSync(messageDir).filter(f => f.endsWith(".json"))
-    for (const file of files) {
-      const content = readFileSync(join(messageDir, file), "utf-8")
-      const data = JSON.parse(content)
-      if (data.parts) {
-        messages.push(data)
-      }
-    }
-  } catch {
-    return []
-  }
-
-  return messages
-}
-
 export function executeDeduplication(
   sessionID: string,
   state: PruningState,
   config: DeduplicationConfig,
-  protectedTools: Set<string>
+  protectedTools: Set<string>,
+  turnProtection?: TurnProtectionConfig
 ): number {
   if (!config.enabled) return 0
 
@@ -140,6 +87,7 @@ export function executeDeduplication(
     }
   }
   
+  const maxTurn = state.currentTurn
   let prunedCount = 0
   let tokensSaved = 0
   
@@ -148,6 +96,16 @@ export function executeDeduplication(
       const toPrune = calls.slice(0, -1)
       
       for (const call of toPrune) {
+        if (isToolProtectedByTurn(call.turn, maxTurn, turnProtection)) {
+          log("[pruning-deduplication] skipping protected turn", {
+            tool: call.toolName,
+            callID: call.callID,
+            turn: call.turn,
+            maxTurn,
+          })
+          continue
+        }
+        
         state.toolIdsToPrune.add(call.callID)
         prunedCount++
         
