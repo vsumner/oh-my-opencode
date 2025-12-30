@@ -1,13 +1,25 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 
 const DEFAULT_MODEL = "google/gemini-3-flash-preview"
+
+export const DOCUMENT_WRITER_DESCRIPTION =
+  "A technical writer who crafts clear, comprehensive documentation. Specializes in README files, API docs, architecture docs, and user guides. MUST BE USED when executing documentation tasks from ai-todo list plans."
+
+export const DOCUMENT_WRITER_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "specialist",
+  cost: "CHEAP",
+  promptAlias: "Document Writer",
+  triggers: [
+    { domain: "Documentation", trigger: "README, API docs, guides" },
+  ],
+}
 
 export function createDocumentWriterAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
   return {
-    description:
-      "A technical writer who crafts clear, comprehensive documentation. Specializes in README files, API docs, architecture docs, and user guides. MUST BE USED when executing documentation tasks from ai-todo list plans.",
+    description: DOCUMENT_WRITER_DESCRIPTION,
     mode: "subagent" as const,
     model,
     tools: { background_task: false },

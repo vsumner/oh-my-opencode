@@ -1,13 +1,31 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 
 const DEFAULT_MODEL = "google/gemini-3-pro-preview"
+
+export const FRONTEND_DESCRIPTION =
+  "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire."
+
+export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "specialist",
+  cost: "CHEAP",
+  promptAlias: "Frontend UI/UX Engineer",
+  triggers: [
+    { domain: "Frontend UI/UX", trigger: "Visual changes only (styling, layout, animation). Pure logic changes in frontend files → handle directly" },
+  ],
+  useWhen: [
+    "Visual/UI/UX changes: Color, spacing, layout, typography, animation, responsive breakpoints, hover states, shadows, borders, icons, images",
+  ],
+  avoidWhen: [
+    "Pure logic: API calls, data fetching, state management, event handlers (non-visual), type definitions, utility functions, business logic",
+  ],
+}
 
 export function createFrontendUiUxEngineerAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
   return {
-    description:
-      "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire.",
+    description: FRONTEND_DESCRIPTION,
     mode: "subagent" as const,
     model,
     tools: { background_task: false },

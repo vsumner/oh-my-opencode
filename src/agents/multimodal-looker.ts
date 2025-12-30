@@ -1,13 +1,23 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentPromptMetadata } from "./types"
 
 const DEFAULT_MODEL = "google/gemini-3-flash"
+
+export const MULTIMODAL_LOOKER_DESCRIPTION =
+  "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents."
+
+export const MULTIMODAL_LOOKER_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "utility",
+  cost: "CHEAP",
+  promptAlias: "Multimodal Looker",
+  triggers: [],
+}
 
 export function createMultimodalLookerAgent(
   model: string = DEFAULT_MODEL
 ): AgentConfig {
   return {
-    description:
-      "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.",
+    description: MULTIMODAL_LOOKER_DESCRIPTION,
     mode: "subagent" as const,
     model,
     temperature: 0.1,
