@@ -35,7 +35,7 @@ function buildAgent(source: AgentSource, model?: string): AgentConfig {
  * so we only include fields that OpenCode doesn't provide to avoid duplication.
  * See: https://github.com/code-yeongyu/oh-my-opencode/issues/379
  */
-export function createEnvContext(_directory: string): string {
+export function createEnvContext(): string {
   const now = new Date()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const locale = Intl.DateTimeFormat().resolvedOptions().locale
@@ -90,7 +90,7 @@ export function createBuiltinAgents(
     let config = buildAgent(source, model)
 
     if ((agentName === "Sisyphus" || agentName === "librarian") && directory && config.prompt) {
-      const envContext = createEnvContext(directory)
+      const envContext = createEnvContext()
       config = { ...config, prompt: config.prompt + envContext }
     }
 
