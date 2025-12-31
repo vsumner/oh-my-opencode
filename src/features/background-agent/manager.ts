@@ -57,25 +57,33 @@ type ClientWithTui = OpencodeClient & {
 
 const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000
 
-const RATE_LIMIT_PATTERNS = [
+export const RATE_LIMIT_PATTERNS = [
   /429/,
   /rate.?limit/i,
   /too.?many.?requests/i,
   /quota.?exceeded/i,
   /throttl/i,
-  /capacity/i,
+  /capacity.?exceeded/i,
   /overloaded/i,
   /resource.?exhausted/i,
 ]
 
-function isRateLimitError(error: unknown): boolean {
+export function isRateLimitError(error: unknown): boolean {
   const errorObj = error as Record<string, unknown> | null
   
   const status = errorObj?.status ?? errorObj?.statusCode ?? 
     (errorObj?.response as Record<string, unknown>)?.status
   if (status === 429) return true
   
-  const errorMessage = error instanceof Error ? error.message : String(error)
+  let errorMessage: string
+  if (error instanceof Error) {
+    errorMessage = error.message
+  } else if (errorObj && typeof errorObj.message === "string") {
+    errorMessage = errorObj.message
+  } else {
+    errorMessage = String(error)
+  }
+  
   return RATE_LIMIT_PATTERNS.some(pattern => pattern.test(errorMessage))
 }
 
@@ -346,7 +354,7 @@ export class BackgroundManager {
 
       if (isRateLimit && modelToUse) {
         const agentConfig = this.agentConfigs[task.agent]
-        const configuredCooldownMs = agentConfig?.cooldown_seconds 
+        const configuredCooldownMs = agentConfig?.cooldown_seconds !== undefined 
           ? agentConfig.cooldown_seconds * 1000 
           : undefined
         const cooldownMs = extractRetryAfterMs(error) ?? configuredCooldownMs ?? DEFAULT_COOLDOWN_MS

@@ -1,27 +1,6 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import type { BackgroundTask } from "./types"
-
-const RATE_LIMIT_PATTERNS = [
-  /429/,
-  /rate.?limit/i,
-  /too.?many.?requests/i,
-  /quota.?exceeded/i,
-  /throttl/i,
-  /capacity/i,
-  /overloaded/i,
-  /resource.?exhausted/i,
-]
-
-function isRateLimitError(error: unknown): boolean {
-  const errorObj = error as Record<string, unknown> | null
-  
-  const status = errorObj?.status ?? errorObj?.statusCode ?? 
-    (errorObj?.response as Record<string, unknown>)?.status
-  if (status === 429) return true
-  
-  const errorMessage = error instanceof Error ? error.message : String(error)
-  return RATE_LIMIT_PATTERNS.some(pattern => pattern.test(errorMessage))
-}
+import { isRateLimitError, RATE_LIMIT_PATTERNS } from "./manager"
 
 class MockBackgroundManager {
   private tasks: Map<string, BackgroundTask> = new Map()
@@ -386,6 +365,50 @@ describe("isRateLimitError", () => {
   test("should return false for 500 errors", () => {
     // #given
     const error = { status: 500, message: "Internal server error" }
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(false)
+  })
+
+  test("should detect message field on non-Error objects", () => {
+    // #given
+    const error = { message: "Rate limit exceeded", code: "RATE_LIMITED" }
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect capacity exceeded", () => {
+    // #given
+    const error = new Error("Server capacity exceeded")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should not false positive on storage capacity", () => {
+    // #given
+    const error = new Error("Storage capacity limit reached")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(false)
+  })
+
+  test("should not false positive on memory capacity", () => {
+    // #given
+    const error = new Error("Memory capacity insufficient")
 
     // #when
     const result = isRateLimitError(error)
