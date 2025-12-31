@@ -807,7 +807,7 @@ Override built-in agent settings:
 }
 ```
 
-Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `fallback`.
+Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `fallback`, `cooldown_seconds`.
 
 You can also override settings for `Sisyphus` (the main orchestrator) and `build` (the default agent) using the same options.
 
@@ -846,13 +846,19 @@ Configure fallback models for rate-limit recovery. When a model hits rate limits
   "agents": {
     "oracle": {
       "model": "openai/gpt-5.2",
-      "fallback": ["anthropic/claude-sonnet-4", "openai/gpt-4o"]
+      "fallback": ["anthropic/claude-sonnet-4", "openai/gpt-4o"],
+      "cooldown_seconds": 180
     }
   }
 }
 ```
 
-When `gpt-5.2` hits rate limits, it automatically falls back to `claude-sonnet-4`, then `gpt-4o`. The circuit breaker cools down rate-limited models for 5 minutes before retrying.
+**How it works:**
+- When `gpt-5.2` hits rate limits, it automatically falls back to `claude-sonnet-4`, then `gpt-4o`
+- Each fallback model is removed from the chain after it's tried (successful or not)
+- Rate-limited models enter a cooldown period (default 5 minutes, or from `Retry-After` header)
+- Use `cooldown_seconds` to customize the cooldown duration per agent (10-3600 seconds)
+- Use `background_reset_cooldowns` tool to manually clear cooldowns for immediate retry
 
 Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 

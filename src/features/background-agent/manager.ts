@@ -40,7 +40,44 @@ interface Todo {
   id: string
 }
 
-const DEFAULT_COOLDOWN_DURATION = 5 * 60 * 1000
+interface TuiShowToastOptions {
+  body: {
+    title: string
+    message: string
+    variant: "success" | "error" | "warning" | "info"
+    duration?: number
+  }
+}
+
+type ClientWithTui = OpencodeClient & {
+  tui?: {
+    showToast?: (options: TuiShowToastOptions) => Promise<unknown>
+  }
+}
+
+const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000
+
+const RATE_LIMIT_PATTERNS = [
+  /429/,
+  /rate.?limit/i,
+  /too.?many.?requests/i,
+  /quota.?exceeded/i,
+  /throttl/i,
+  /capacity/i,
+  /overloaded/i,
+  /resource.?exhausted/i,
+]
+
+function isRateLimitError(error: unknown): boolean {
+  const errorObj = error as Record<string, unknown> | null
+  
+  const status = errorObj?.status ?? errorObj?.statusCode ?? 
+    (errorObj?.response as Record<string, unknown>)?.status
+  if (status === 429) return true
+  
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  return RATE_LIMIT_PATTERNS.some(pattern => pattern.test(errorMessage))
+}
 
 function parseDurationToMs(duration: string): number | undefined {
   let totalMs = 0
@@ -146,8 +183,7 @@ export class BackgroundManager {
     this.modelCooldowns.clear()
     log("[background-agent] All model cooldowns reset")
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (tuiClient.tui?.showToast) {
       tuiClient.tui.showToast({
         body: {
@@ -164,8 +200,7 @@ export class BackgroundManager {
     this.modelCooldowns.delete(model)
     log(`[background-agent] Cooldown reset for model: ${model}`)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (tuiClient.tui?.showToast) {
       tuiClient.tui.showToast({
         body: {
@@ -305,12 +340,16 @@ export class BackgroundManager {
       }
 
       const errorMessage = error instanceof Error ? error.message : String(error)
-      const isRateLimit = errorMessage.includes("429") || errorMessage.toLowerCase().includes("rate limit")
+      const isRateLimit = isRateLimitError(error)
 
       log("[background-agent] executeTask error:", { taskId: task.id, error: errorMessage, isRateLimit, modelOverride })
 
       if (isRateLimit && modelToUse) {
-        const cooldownMs = extractRetryAfterMs(error) ?? DEFAULT_COOLDOWN_DURATION
+        const agentConfig = this.agentConfigs[task.agent]
+        const configuredCooldownMs = agentConfig?.cooldown_seconds 
+          ? agentConfig.cooldown_seconds * 1000 
+          : undefined
+        const cooldownMs = extractRetryAfterMs(error) ?? configuredCooldownMs ?? DEFAULT_COOLDOWN_MS
         const cooldownSec = Math.round(cooldownMs / 1000)
         log(`[background-agent] Rate limit detected. Circuit breaker tripped for ${modelToUse} for ${cooldownSec}s.`)
         this.modelCooldowns.set(modelToUse, Date.now() + cooldownMs)
@@ -521,6 +560,7 @@ export class BackgroundManager {
     this.stopPolling()
     this.tasks.clear()
     this.notifications.clear()
+    this.modelCooldowns.clear()
   }
 
   private notifyParentSession(task: BackgroundTask): void {
@@ -528,8 +568,7 @@ export class BackgroundManager {
 
     log("[background-agent] notifyParentSession called for task:", task.id)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (tuiClient.tui?.showToast) {
       tuiClient.tui.showToast({
         body: {

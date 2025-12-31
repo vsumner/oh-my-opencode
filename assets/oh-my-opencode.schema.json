@@ -197,6 +197,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -317,6 +322,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -437,6 +447,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -557,6 +572,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -677,6 +697,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -797,6 +822,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -917,6 +947,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -1037,6 +1072,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -1157,6 +1197,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -1277,6 +1322,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         },
@@ -1397,6 +1447,11 @@
               "items": {
                 "type": "string"
               }
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 3600
             }
           }
         }

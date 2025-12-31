@@ -91,6 +91,7 @@ export const AgentOverrideConfigSchema = z.object({
     .optional(),
   permission: AgentPermissionSchema.optional(),
   fallback: z.array(z.string()).optional(),
+  cooldown_seconds: z.number().min(10).max(3600).optional(),
 })
 
 export const AgentOverridesSchema = z.object({

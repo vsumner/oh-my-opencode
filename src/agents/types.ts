@@ -74,6 +74,7 @@ export type AgentName = BuiltinAgentName
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   prompt_append?: string
   fallback?: string[]
+  cooldown_seconds?: number
 }
 
 export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>

@@ -1,8 +1,31 @@
 import { describe, test, expect, beforeEach } from "bun:test"
 import type { BackgroundTask } from "./types"
 
+const RATE_LIMIT_PATTERNS = [
+  /429/,
+  /rate.?limit/i,
+  /too.?many.?requests/i,
+  /quota.?exceeded/i,
+  /throttl/i,
+  /capacity/i,
+  /overloaded/i,
+  /resource.?exhausted/i,
+]
+
+function isRateLimitError(error: unknown): boolean {
+  const errorObj = error as Record<string, unknown> | null
+  
+  const status = errorObj?.status ?? errorObj?.statusCode ?? 
+    (errorObj?.response as Record<string, unknown>)?.status
+  if (status === 429) return true
+  
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  return RATE_LIMIT_PATTERNS.some(pattern => pattern.test(errorMessage))
+}
+
 class MockBackgroundManager {
   private tasks: Map<string, BackgroundTask> = new Map()
+  private modelCooldowns: Map<string, number> = new Map()
 
   addTask(task: BackgroundTask): void {
     this.tasks.set(task.id, task)
@@ -10,6 +33,35 @@ class MockBackgroundManager {
 
   getTask(id: string): BackgroundTask | undefined {
     return this.tasks.get(id)
+  }
+
+  setCooldown(model: string, expiresAt: number): void {
+    this.modelCooldowns.set(model, expiresAt)
+  }
+
+  getCooldown(model: string): number | undefined {
+    return this.modelCooldowns.get(model)
+  }
+
+  resetCooldowns(): void {
+    this.modelCooldowns.clear()
+  }
+
+  findAvailableFallback(task: BackgroundTask): string | undefined {
+    if (!task.fallback) return undefined
+
+    const now = Date.now()
+    for (let i = 0; i < task.fallback.length; i++) {
+      const candidate = task.fallback[i]
+      const cooldownUntil = this.modelCooldowns.get(candidate)
+
+      if (!cooldownUntil || cooldownUntil <= now) {
+        task.fallback.splice(i, 1)
+        return candidate
+      }
+    }
+
+    return undefined
   }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
@@ -228,5 +280,259 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     // #then
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe("task-b")
+  })
+})
+
+describe("isRateLimitError", () => {
+  test("should detect 429 status code in error object", () => {
+    // #given
+    const error = { status: 429, message: "Rate limit exceeded" }
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect 429 status code in nested response", () => {
+    // #given
+    const error = { response: { status: 429 } }
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect rate limit in error message", () => {
+    // #given
+    const error = new Error("API rate limit exceeded")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect 429 in error message string", () => {
+    // #given
+    const error = "Error 429: Too many requests"
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect quota exceeded", () => {
+    // #given
+    const error = new Error("Quota exceeded for this model")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect throttling", () => {
+    // #given
+    const error = new Error("Request throttled by server")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect resource exhausted (Google)", () => {
+    // #given
+    const error = new Error("RESOURCE_EXHAUSTED: Quota exceeded")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should detect overloaded", () => {
+    // #given
+    const error = new Error("Service overloaded, please retry")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(true)
+  })
+
+  test("should return false for non-rate-limit errors", () => {
+    // #given
+    const error = new Error("Connection timeout")
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(false)
+  })
+
+  test("should return false for 500 errors", () => {
+    // #given
+    const error = { status: 500, message: "Internal server error" }
+
+    // #when
+    const result = isRateLimitError(error)
+
+    // #then
+    expect(result).toBe(false)
+  })
+})
+
+describe("findAvailableFallback", () => {
+  let manager: MockBackgroundManager
+
+  beforeEach(() => {
+    manager = new MockBackgroundManager()
+  })
+
+  test("should return first fallback when none are on cooldown", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-a",
+      fallback: ["model-a", "model-b", "model-c"],
+    })
+
+    // #when
+    const result = manager.findAvailableFallback(task)
+
+    // #then
+    expect(result).toBe("model-a")
+    expect(task.fallback).toEqual(["model-b", "model-c"])
+  })
+
+  test("should skip models on cooldown", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-a",
+      fallback: ["model-a", "model-b", "model-c"],
+    })
+    manager.setCooldown("model-a", Date.now() + 60000)
+
+    // #when
+    const result = manager.findAvailableFallback(task)
+
+    // #then
+    expect(result).toBe("model-b")
+    expect(task.fallback).toEqual(["model-a", "model-c"])
+  })
+
+  test("should preserve models on cooldown in fallback array", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-a",
+      fallback: ["model-a", "model-b", "model-c"],
+    })
+    manager.setCooldown("model-a", Date.now() + 60000)
+    manager.setCooldown("model-b", Date.now() + 60000)
+
+    // #when
+    const result = manager.findAvailableFallback(task)
+
+    // #then
+    expect(result).toBe("model-c")
+    expect(task.fallback).toEqual(["model-a", "model-b"])
+  })
+
+  test("should return undefined when all fallbacks on cooldown", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-a",
+      fallback: ["model-a", "model-b"],
+    })
+    manager.setCooldown("model-a", Date.now() + 60000)
+    manager.setCooldown("model-b", Date.now() + 60000)
+
+    // #when
+    const result = manager.findAvailableFallback(task)
+
+    // #then
+    expect(result).toBeUndefined()
+    expect(task.fallback).toEqual(["model-a", "model-b"])
+  })
+
+  test("should return undefined when fallback array is empty", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-a",
+      fallback: [],
+    })
+
+    // #when
+    const result = manager.findAvailableFallback(task)
+
+    // #then
+    expect(result).toBeUndefined()
+  })
+
+  test("should return undefined when no fallback configured", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-a",
+    })
+
+    // #when
+    const result = manager.findAvailableFallback(task)
+
+    // #then
+    expect(result).toBeUndefined()
+  })
+
+  test("should use expired cooldown model", () => {
+    // #given
+    const task = createMockTask({
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-a",
+      fallback: ["model-a", "model-b"],
+    })
+    manager.setCooldown("model-a", Date.now() - 1000)
+
+    // #when
+    const result = manager.findAvailableFallback(task)
+
+    // #then
+    expect(result).toBe("model-a")
+  })
+
+  test("resetCooldowns should clear all cooldowns", () => {
+    // #given
+    manager.setCooldown("model-a", Date.now() + 60000)
+    manager.setCooldown("model-b", Date.now() + 60000)
+
+    // #when
+    manager.resetCooldowns()
+
+    // #then
+    expect(manager.getCooldown("model-a")).toBeUndefined()
+    expect(manager.getCooldown("model-b")).toBeUndefined()
   })
 })
