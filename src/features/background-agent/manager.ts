@@ -180,22 +180,23 @@ export class BackgroundManager {
 
   /**
    * Find the next available fallback model that is not on cooldown.
-   * Removes checked models from the fallback array as it searches.
-   * Returns undefined if all fallbacks are on cooldown.
+   * Only removes the model that is actually selected for use.
+   * Returns undefined if all fallbacks are currently on cooldown.
    */
   private findAvailableFallback(task: BackgroundTask): string | undefined {
     if (!task.fallback) return undefined
 
-    while (task.fallback.length > 0) {
-      const candidate = task.fallback[0]
+    const now = Date.now()
+    for (let i = 0; i < task.fallback.length; i++) {
+      const candidate = task.fallback[i]
       const cooldownUntil = this.modelCooldowns.get(candidate)
-      
-      if (!cooldownUntil || cooldownUntil <= Date.now()) {
-        return task.fallback.shift()
+
+      if (!cooldownUntil || cooldownUntil <= now) {
+        task.fallback.splice(i, 1)
+        return candidate
       }
-      
-      log(`[background-agent] Skipping fallback "${candidate}" (also on cooldown)`)
-      task.fallback.shift()
+
+      log(`[background-agent] Skipping fallback "${candidate}" (on cooldown until ${new Date(cooldownUntil).toISOString()})`)
     }
 
     return undefined
