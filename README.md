@@ -493,6 +493,11 @@ These workflows are possible with OhMyOpenCode.
 
 Run subagents in the background. The main agent gets notified on completion. Wait for results if needed.
 
+**Rate-Limit Recovery**: When a model hits rate limits, the circuit breaker kicks in:
+- Automatically cools down rate-limited models for 5 minutes
+- Falls back to alternative models via the `fallback` config (e.g., `"fallback": ["anthropic/claude-sonnet-4", "openai/gpt-4o"]`)
+- Use `background_reset_cooldowns` tool to manually clear cooldowns if you want to retry immediately
+
 **Make your agents work like your team works.**
 
 ### The Tools: Your Teammates Deserve Better
@@ -523,6 +528,17 @@ Hand your best tools to your best colleagues. Now they can properly refactor, na
 - **ast_grep_search**: AST-aware code pattern search (25 languages)
 - **ast_grep_replace**: AST-aware code replacement
 - **call_omo_agent**: Spawn specialized explore/librarian agents. Supports `run_in_background` parameter for async execution.
+
+#### Background Task Management
+
+Tools for managing asynchronous agent tasks:
+
+- **background_task**: Run agent task in background. Returns task_id immediately; notifies on completion.
+- **background_output**: Get output from background task. System notifies on completion, so blocking rarely needed.
+- **background_cancel**: Cancel running background task(s). Use `all=true` to cancel all before final answer.
+- **background_reset_cooldowns**: Resets the rate-limit circuit breaker for background agents. Use this to retry a model immediately after a rate limit cooldown.
+
+These tools enable parallel agent orchestration—run multiple models simultaneously and collect results when ready.
 
 #### Session Management
 
@@ -791,7 +807,7 @@ Override built-in agent settings:
 }
 ```
 
-Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`.
+Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `fallback`.
 
 You can also override settings for `Sisyphus` (the main orchestrator) and `build` (the default agent) using the same options.
 
@@ -820,6 +836,23 @@ Fine-grained control over what agents can do:
 | `webfetch`           | Web request permission                 | `ask` / `allow` / `deny`                                                    |
 | `doom_loop`          | Allow infinite loop detection override | `ask` / `allow` / `deny`                                                    |
 | `external_directory` | Access files outside project root      | `ask` / `allow` / `deny`                                                    |
+
+#### Fallback Models
+
+Configure fallback models for rate-limit recovery. When a model hits rate limits, the agent automatically tries the next model in the fallback chain:
+
+```json
+{
+  "agents": {
+    "oracle": {
+      "model": "openai/gpt-5.2",
+      "fallback": ["anthropic/claude-sonnet-4", "openai/gpt-4o"]
+    }
+  }
+}
+```
+
+When `gpt-5.2` hits rate limits, it automatically falls back to `claude-sonnet-4`, then `gpt-4o`. The circuit breaker cools down rate-limited models for 5 minutes before retrying.
 
 Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
 
