@@ -191,6 +191,12 @@
                   ]
                 }
               }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
@@ -304,6 +310,12 @@
                     "deny"
                   ]
                 }
+              }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
             }
           }
@@ -419,6 +431,12 @@
                   ]
                 }
               }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
@@ -532,6 +550,12 @@
                     "deny"
                   ]
                 }
+              }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
             }
           }
@@ -647,6 +671,12 @@
                   ]
                 }
               }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
@@ -760,6 +790,12 @@
                     "deny"
                   ]
                 }
+              }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
             }
           }
@@ -875,6 +911,12 @@
                   ]
                 }
               }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
@@ -988,6 +1030,12 @@
                     "deny"
                   ]
                 }
+              }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
             }
           }
@@ -1103,6 +1151,12 @@
                   ]
                 }
               }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
@@ -1217,6 +1271,12 @@
                   ]
                 }
               }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
@@ -1330,6 +1390,12 @@
                     "deny"
                   ]
                 }
+              }
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
             }
           }

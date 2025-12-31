@@ -36,6 +36,7 @@ import {
   createBackgroundTask,
   createBackgroundOutput,
   createBackgroundCancel,
+  createBackgroundResetCooldowns,
 } from "./background-task"
 
 import type { PluginInput, ToolDefinition } from "@opencode-ai/plugin"
@@ -51,6 +52,7 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
     background_task: createBackgroundTask(manager),
     background_output: createBackgroundOutput(manager, client),
     background_cancel: createBackgroundCancel(manager, client),
+    background_reset_cooldowns: createBackgroundResetCooldowns(manager),
   }
 }
 

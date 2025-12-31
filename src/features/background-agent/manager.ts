@@ -5,12 +5,14 @@ import type {
   BackgroundTask,
   LaunchInput,
 } from "./types"
+import type { AgentOverrideConfig } from "../../agents/types"
 import { log } from "../../shared/logger"
 import {
   findNearestMessageWithFields,
   MESSAGE_STORAGE,
 } from "../hook-message-injector"
 import { subagentSessions } from "../claude-code-session-state"
+import { parseModelString } from "../../shared/model-sanitizer"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -38,6 +40,8 @@ interface Todo {
   id: string
 }
 
+const COOLDOWN_DURATION = 5 * 60 * 1000 // 5 minutes
+
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
 
@@ -58,12 +62,54 @@ export class BackgroundManager {
   private client: OpencodeClient
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
+  private agentConfigs: Record<string, AgentOverrideConfig> = {}
+  private modelCooldowns: Map<string, number> = new Map()
 
   constructor(ctx: PluginInput) {
     this.tasks = new Map()
     this.notifications = new Map()
     this.client = ctx.client
     this.directory = ctx.directory
+  }
+
+  setAgentConfigs(configs: Record<string, AgentOverrideConfig>): void {
+    this.agentConfigs = configs
+  }
+
+  public resetCooldowns(): void {
+    this.modelCooldowns.clear()
+    log("[background-agent] All model cooldowns reset")
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tuiClient = this.client as any
+    if (tuiClient.tui?.showToast) {
+      tuiClient.tui.showToast({
+        body: {
+          title: "Cooldowns Reset",
+          message: "All model rate-limit cooldowns have been cleared.",
+          variant: "success",
+          duration: 3000,
+        },
+      }).catch(() => {})
+    }
+  }
+
+  public resetCooldown(model: string): void {
+    this.modelCooldowns.delete(model)
+    log(`[background-agent] Cooldown reset for model: ${model}`)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tuiClient = this.client as any
+    if (tuiClient.tui?.showToast) {
+      tuiClient.tui.showToast({
+        body: {
+          title: "Cooldown Reset",
+          message: `Rate-limit cooldown cleared for model: ${model}`,
+          variant: "success",
+          duration: 3000,
+        },
+      }).catch(() => {})
+    }
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -85,6 +131,9 @@ export class BackgroundManager {
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
 
+    const agentConfig = this.agentConfigs[input.agent]
+    const fallback = agentConfig?.fallback ? [...agentConfig.fallback] : []
+
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
       sessionID,
@@ -100,6 +149,8 @@ export class BackgroundManager {
         lastUpdate: new Date(),
       },
       parentModel: input.parentModel,
+      fallback,
+      retryCount: 0,
     }
 
     this.tasks.set(task.id, task)
@@ -107,38 +158,115 @@ export class BackgroundManager {
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
 
-    this.client.session.promptAsync({
-      path: { id: sessionID },
-      body: {
-        agent: input.agent,
-        tools: {
-          task: false,
-          background_task: false,
-        },
-        parts: [{ type: "text", text: input.prompt }],
-      },
-    }).catch((error) => {
-      log("[background-agent] promptAsync error:", error)
-      const existingTask = this.findBySession(sessionID)
-      if (existingTask) {
-        existingTask.status = "error"
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-          existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
-        } else {
-          existingTask.error = errorMessage
-        }
-        existingTask.completedAt = new Date()
-        this.markForNotification(existingTask)
-        this.notifyParentSession(existingTask)
-      }
-    })
+    this.executeTask(task)
 
     return task
   }
 
+  private executeTask(task: BackgroundTask, modelOverride?: string): void {
+    if (task.status === "cancelled") return;
+
+    // Determine the model being used
+    let modelToUse: string | undefined = modelOverride
+    if (!modelToUse) {
+      const agentConfig = this.agentConfigs[task.agent]
+      modelToUse = agentConfig?.model
+    }
+
+    // Circuit Breaker: Check if model is on cooldown
+    if (modelToUse) {
+      const cooldownUntil = this.modelCooldowns.get(modelToUse)
+      if (cooldownUntil && cooldownUntil > Date.now()) {
+        log(`[background-agent] Skipping rate-limited model "${modelToUse}" (Circuit Breaker active)`)
+        
+        if (task.fallback && task.fallback.length > 0) {
+          const nextModel = task.fallback.shift()!
+          log(`[background-agent] Circuit Breaker: Attempting next fallback for task ${task.id}`)
+          this.executeTask(task, nextModel)
+          return
+        } else {
+          task.status = "error"
+          task.error = `All models (including fallbacks) are currently rate-limited or unavailable for agent "${task.agent}".`
+          task.completedAt = new Date()
+          this.markForNotification(task)
+          this.notifyParentSession(task)
+          return
+        }
+      }
+    }
+
+    const model = modelToUse ? parseModelString(modelToUse) : undefined
+
+    this.client.session.promptAsync({
+      path: { id: task.sessionID },
+      body: {
+        agent: task.agent,
+        model,
+        tools: {
+          task: false,
+          background_task: false,
+        },
+        parts: [{ type: "text", text: task.prompt }],
+      },
+    }).catch((error) => {
+      if (task.status === "cancelled") {
+        log("[background-agent] executeTask: Task was cancelled, skipping error handling:", task.id)
+        return
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const isRateLimit = errorMessage.includes("429") || errorMessage.toLowerCase().includes("rate limit")
+
+      if (isRateLimit && modelToUse) {
+        log(`[background-agent] Rate limit detected. Circuit breaker tripped for ${modelToUse} for 5 minutes.`)
+        this.modelCooldowns.set(modelToUse, Date.now() + COOLDOWN_DURATION)
+      }
+
+      log("[background-agent] executeTask error:", { taskId: task.id, error: errorMessage, modelOverride })
+      
+      if (task.fallback && task.fallback.length > 0) {
+        const nextModel = task.fallback.shift()!
+        task.retryCount = (task.retryCount || 0) + 1
+        task.status = "running"
+        
+        log("[background-agent] Attempting fallback:", { 
+          taskId: task.id, 
+          fallbackModel: nextModel, 
+          retryCount: task.retryCount 
+        })
+        
+        this.executeTask(task, nextModel)
+        return
+      }
+
+      task.status = "error"
+      if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
+        task.error = `Agent "${task.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+      } else {
+        task.error = errorMessage
+      }
+      task.completedAt = new Date()
+      this.markForNotification(task)
+      this.notifyParentSession(task)
+    })
+  }
+
   getTask(id: string): BackgroundTask | undefined {
     return this.tasks.get(id)
+  }
+
+  public cancelTask(taskId: string): boolean {
+    const task = this.tasks.get(taskId)
+    if (!task) return false
+
+    task.status = "cancelled"
+    task.completedAt = new Date()
+    log("[background-agent] Task cancelled:", taskId)
+
+    this.tasks.delete(taskId)
+    this.clearNotificationsForTask(taskId)
+    subagentSessions.delete(task.sessionID)
+    return true
   }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {

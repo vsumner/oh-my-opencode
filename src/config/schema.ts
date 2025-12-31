@@ -90,6 +90,7 @@ export const AgentOverrideConfigSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
   permission: AgentPermissionSchema.optional(),
+  fallback: z.array(z.string()).optional(),
 })
 
 export const AgentOverridesSchema = z.object({

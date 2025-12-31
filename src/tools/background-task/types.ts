@@ -14,3 +14,7 @@ export interface BackgroundCancelArgs {
   taskId?: string
   all?: boolean
 }
+
+export interface BackgroundResetCooldownsArgs {
+  model?: string
+}

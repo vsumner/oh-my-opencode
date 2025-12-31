@@ -260,6 +260,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const backgroundManager = new BackgroundManager(ctx);
+  backgroundManager.setAgentConfigs(pluginConfig.agents ?? {});
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
     ? createTodoContinuationEnforcer(ctx, { backgroundManager })

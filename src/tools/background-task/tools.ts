@@ -2,8 +2,8 @@ import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
-import type { BackgroundTaskArgs, BackgroundOutputArgs, BackgroundCancelArgs } from "./types"
-import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_CANCEL_DESCRIPTION } from "./constants"
+import type { BackgroundTaskArgs, BackgroundOutputArgs, BackgroundCancelArgs, BackgroundResetCooldownsArgs } from "./types"
+import { BACKGROUND_TASK_DESCRIPTION, BACKGROUND_OUTPUT_DESCRIPTION, BACKGROUND_CANCEL_DESCRIPTION, BACKGROUND_RESET_COOLDOWNS_DESCRIPTION } from "./constants"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 
 type OpencodeClient = PluginInput["client"]
@@ -364,6 +364,28 @@ Session ID: ${task.sessionID}
 Status: ${task.status}`
       } catch (error) {
         return `❌ Error cancelling task: ${error instanceof Error ? error.message : String(error)}`
+      }
+    },
+  })
+}
+
+export function createBackgroundResetCooldowns(manager: BackgroundManager): ToolDefinition {
+  return tool({
+    description: BACKGROUND_RESET_COOLDOWNS_DESCRIPTION,
+    args: {
+      model: tool.schema.string().optional().describe("Specific model to reset cooldown for (optional). If not provided, all cooldowns are reset."),
+    },
+    async execute(args: BackgroundResetCooldownsArgs) {
+      try {
+        if (args.model) {
+          manager.resetCooldown(args.model)
+          return `✅ Cooldown reset for model: ${args.model}`
+        } else {
+          manager.resetCooldowns()
+          return `✅ All model cooldowns reset`
+        }
+      } catch (error) {
+        return `❌ Error resetting cooldowns: ${error instanceof Error ? error.message : String(error)}`
       }
     },
   })
