@@ -112,6 +112,29 @@ export class BackgroundManager {
     }
   }
 
+  /**
+   * Find the next available fallback model that is not on cooldown.
+   * Removes checked models from the fallback array as it searches.
+   * Returns undefined if all fallbacks are on cooldown.
+   */
+  private findAvailableFallback(task: BackgroundTask): string | undefined {
+    if (!task.fallback) return undefined
+
+    while (task.fallback.length > 0) {
+      const candidate = task.fallback[0]
+      const cooldownUntil = this.modelCooldowns.get(candidate)
+      
+      if (!cooldownUntil || cooldownUntil <= Date.now()) {
+        return task.fallback.shift()
+      }
+      
+      log(`[background-agent] Skipping fallback "${candidate}" (also on cooldown)`)
+      task.fallback.shift()
+    }
+
+    return undefined
+  }
+
   async launch(input: LaunchInput): Promise<BackgroundTask> {
     if (!input.agent || input.agent.trim() === "") {
       throw new Error("Agent parameter is required")
@@ -179,9 +202,9 @@ export class BackgroundManager {
       if (cooldownUntil && cooldownUntil > Date.now()) {
         log(`[background-agent] Skipping rate-limited model "${modelToUse}" (Circuit Breaker active)`)
         
-        if (task.fallback && task.fallback.length > 0) {
-          const nextModel = task.fallback.shift()!
-          log(`[background-agent] Circuit Breaker: Attempting next fallback for task ${task.id}`)
+        const nextModel = this.findAvailableFallback(task)
+        if (nextModel) {
+          log(`[background-agent] Circuit Breaker: Attempting fallback "${nextModel}" for task ${task.id}`)
           this.executeTask(task, nextModel)
           return
         } else {
@@ -217,26 +240,26 @@ export class BackgroundManager {
       const errorMessage = error instanceof Error ? error.message : String(error)
       const isRateLimit = errorMessage.includes("429") || errorMessage.toLowerCase().includes("rate limit")
 
+      log("[background-agent] executeTask error:", { taskId: task.id, error: errorMessage, isRateLimit, modelOverride })
+
       if (isRateLimit && modelToUse) {
         log(`[background-agent] Rate limit detected. Circuit breaker tripped for ${modelToUse} for 5 minutes.`)
         this.modelCooldowns.set(modelToUse, Date.now() + COOLDOWN_DURATION)
-      }
-
-      log("[background-agent] executeTask error:", { taskId: task.id, error: errorMessage, modelOverride })
-      
-      if (task.fallback && task.fallback.length > 0) {
-        const nextModel = task.fallback.shift()!
-        task.retryCount = (task.retryCount || 0) + 1
-        task.status = "running"
         
-        log("[background-agent] Attempting fallback:", { 
-          taskId: task.id, 
-          fallbackModel: nextModel, 
-          retryCount: task.retryCount 
-        })
-        
-        this.executeTask(task, nextModel)
-        return
+        const nextModel = this.findAvailableFallback(task)
+        if (nextModel) {
+          task.retryCount = (task.retryCount || 0) + 1
+          task.status = "running"
+          
+          log("[background-agent] Rate limit fallback:", { 
+            taskId: task.id, 
+            fallbackModel: nextModel, 
+            retryCount: task.retryCount 
+          })
+          
+          this.executeTask(task, nextModel)
+          return
+        }
       }
 
       task.status = "error"
