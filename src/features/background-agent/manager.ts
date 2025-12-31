@@ -42,6 +42,21 @@ interface Todo {
 
 const DEFAULT_COOLDOWN_DURATION = 5 * 60 * 1000
 
+function parseDurationToMs(duration: string): number | undefined {
+  let totalMs = 0
+  const hourMatch = duration.match(/(\d+)h/)
+  const minMatch = duration.match(/(\d+)m/)
+  const secMatch = duration.match(/(\d+)s/)
+  const msMatch = duration.match(/(\d+)ms/)
+  
+  if (hourMatch) totalMs += parseInt(hourMatch[1], 10) * 3600000
+  if (minMatch) totalMs += parseInt(minMatch[1], 10) * 60000
+  if (secMatch) totalMs += parseInt(secMatch[1], 10) * 1000
+  if (msMatch) totalMs += parseInt(msMatch[1], 10)
+  
+  return totalMs > 0 ? totalMs : undefined
+}
+
 function extractRetryAfterMs(error: unknown): number | undefined {
   if (!error || typeof error !== "object") return undefined
 
@@ -49,6 +64,16 @@ function extractRetryAfterMs(error: unknown): number | undefined {
   const headers = (errorObj.headers ?? (errorObj.response as Record<string, unknown>)?.headers) as Record<string, unknown> | undefined
   
   const retryAfter = errorObj.retryAfter ?? headers?.["retry-after"]
+  const resetRequests = headers?.["x-ratelimit-reset-requests"] as string | undefined
+  const resetTokens = headers?.["x-ratelimit-reset-tokens"] as string | undefined
+
+  if (resetRequests || resetTokens) {
+    const requestsMs = resetRequests ? parseDurationToMs(resetRequests) : undefined
+    const tokensMs = resetTokens ? parseDurationToMs(resetTokens) : undefined
+    if (requestsMs || tokensMs) {
+      return Math.max(requestsMs ?? 0, tokensMs ?? 0)
+    }
+  }
 
   if (retryAfter === undefined || retryAfter === null) {
     const message = errorObj.message as string | undefined
@@ -66,6 +91,9 @@ function extractRetryAfterMs(error: unknown): number | undefined {
   }
 
   if (typeof retryAfter === "string") {
+    const durationMs = parseDurationToMs(retryAfter)
+    if (durationMs) return durationMs
+
     const seconds = parseInt(retryAfter, 10)
     if (!isNaN(seconds)) {
       return seconds * 1000
