@@ -40,7 +40,45 @@ interface Todo {
   id: string
 }
 
-const COOLDOWN_DURATION = 5 * 60 * 1000 // 5 minutes
+const DEFAULT_COOLDOWN_DURATION = 5 * 60 * 1000
+
+function extractRetryAfterMs(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined
+
+  const errorObj = error as Record<string, unknown>
+  const headers = (errorObj.headers ?? (errorObj.response as Record<string, unknown>)?.headers) as Record<string, unknown> | undefined
+  
+  const retryAfter = errorObj.retryAfter ?? headers?.["retry-after"]
+
+  if (retryAfter === undefined || retryAfter === null) {
+    const message = errorObj.message as string | undefined
+    if (message) {
+      const match = message.match(/retry[- ]?after[:\s]+(\d+)/i)
+      if (match) {
+        return parseInt(match[1], 10) * 1000
+      }
+    }
+    return undefined
+  }
+
+  if (typeof retryAfter === "number") {
+    return retryAfter * 1000
+  }
+
+  if (typeof retryAfter === "string") {
+    const seconds = parseInt(retryAfter, 10)
+    if (!isNaN(seconds)) {
+      return seconds * 1000
+    }
+
+    const date = new Date(retryAfter)
+    if (!isNaN(date.getTime())) {
+      return Math.max(0, date.getTime() - Date.now())
+    }
+  }
+
+  return undefined
+}
 
 function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -243,8 +281,10 @@ export class BackgroundManager {
       log("[background-agent] executeTask error:", { taskId: task.id, error: errorMessage, isRateLimit, modelOverride })
 
       if (isRateLimit && modelToUse) {
-        log(`[background-agent] Rate limit detected. Circuit breaker tripped for ${modelToUse} for 5 minutes.`)
-        this.modelCooldowns.set(modelToUse, Date.now() + COOLDOWN_DURATION)
+        const cooldownMs = extractRetryAfterMs(error) ?? DEFAULT_COOLDOWN_DURATION
+        const cooldownSec = Math.round(cooldownMs / 1000)
+        log(`[background-agent] Rate limit detected. Circuit breaker tripped for ${modelToUse} for ${cooldownSec}s.`)
+        this.modelCooldowns.set(modelToUse, Date.now() + cooldownMs)
         
         const nextModel = this.findAvailableFallback(task)
         if (nextModel) {
