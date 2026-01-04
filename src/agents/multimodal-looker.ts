@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { PERMISSION_READ_ONLY } from "./permission-constants"
 
 const DEFAULT_MODEL = "google/gemini-3-flash"
 
@@ -19,7 +20,7 @@ export function createMultimodalLookerAgent(
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, bash: false, background_task: false },
+    permission: PERMISSION_READ_ONLY,
     prompt: `You interpret media files that cannot be read as plain text.
 
 Your job: examine the attached file and extract ONLY what was requested.

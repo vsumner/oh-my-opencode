@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
+import { PERMISSION_READ_ONLY } from "./permission-constants"
 
 const DEFAULT_MODEL = "openai/gpt-5.2"
 
@@ -103,7 +104,7 @@ export function createOracleAgent(model: string = DEFAULT_MODEL): AgentConfig {
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, task: false, background_task: false },
+    permission: PERMISSION_READ_ONLY,
     prompt: ORACLE_SYSTEM_PROMPT,
   }
 

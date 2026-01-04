@@ -113,15 +113,6 @@
             "prompt_append": {
               "type": "string"
             },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
             "disable": {
               "type": "boolean"
             },
@@ -226,15 +217,6 @@
             },
             "prompt_append": {
               "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
             },
             "disable": {
               "type": "boolean"
@@ -341,15 +323,6 @@
             "prompt_append": {
               "type": "string"
             },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
             "disable": {
               "type": "boolean"
             },
@@ -454,15 +427,6 @@
             },
             "prompt_append": {
               "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
             },
             "disable": {
               "type": "boolean"
@@ -569,15 +533,6 @@
             "prompt_append": {
               "type": "string"
             },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
             "disable": {
               "type": "boolean"
             },
@@ -682,15 +637,6 @@
             },
             "prompt_append": {
               "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
             },
             "disable": {
               "type": "boolean"
@@ -797,15 +743,6 @@
             "prompt_append": {
               "type": "string"
             },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
             "disable": {
               "type": "boolean"
             },
@@ -910,15 +847,6 @@
             },
             "prompt_append": {
               "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
             },
             "disable": {
               "type": "boolean"
@@ -1025,15 +953,6 @@
             "prompt_append": {
               "type": "string"
             },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
             "disable": {
               "type": "boolean"
             },
@@ -1139,15 +1058,6 @@
             "prompt_append": {
               "type": "string"
             },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            },
             "disable": {
               "type": "boolean"
             },
@@ -1252,15 +1162,6 @@
             },
             "prompt_append": {
               "type": "string"
-            },
-            "tools": {
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "boolean"
-              }
             },
             "disable": {
               "type": "boolean"

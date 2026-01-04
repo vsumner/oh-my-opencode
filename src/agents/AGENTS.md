@@ -43,7 +43,7 @@ agents/
      model: "provider/model-name",
      temperature: 0.1,
      system: "...",
-     tools: { include: ["tool1"] },
+     permission: { edit: "allow", bash: "allow" },
    }
    ```
 2. Add to `builtinAgents` in index.ts
@@ -55,6 +55,19 @@ agents/
 1. User config override
 2. Installer settings (claude max20, gemini antigravity)
 3. Default model
+
+## PERMISSION PATTERNS
+
+Agents use shared permission constants from `permission-constants.ts`:
+- **Read-only agents** (oracle, explore, librarian, multimodal-looker): `PERMISSION_READ_ONLY`
+  - No file editing
+  - No bash execution
+- **Write-only agents** (document-writer, frontend-ui-ux-engineer): `PERMISSION_WRITE_ONLY`
+  - Can edit files
+  - No bash execution
+- **Full access agents** (Sisyphus, build, plan): `PERMISSION_FULL_ACCESS`
+  - Can edit files
+  - Can execute bash
 
 ## ANTI-PATTERNS
 

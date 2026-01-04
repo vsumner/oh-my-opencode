@@ -633,7 +633,85 @@ describe("todo-continuation-enforcer", () => {
 
     await new Promise(r => setTimeout(r, 3000))
 
-    // #then - no continuation (abort was immediately before)
     expect(promptCalls).toHaveLength(0)
   })
+
+  test("should skip enforcement after rate limit error", async () => {
+    const sessionID = "main-rate-limit"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    await hook.handler({
+      event: { type: "session.error", properties: { sessionID, error: { message: "Rate limit exceeded" } } },
+    })
+
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 3000))
+
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should resume enforcement after user message following rate limit", async () => {
+    const sessionID = "main-rate-limit-clear"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    await hook.handler({
+      event: { type: "session.error", properties: { sessionID, error: { message: "429 Too Many Requests" } } },
+    })
+
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user" } },
+      },
+    })
+
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await new Promise(r => setTimeout(r, 2500))
+
+    expect(promptCalls.length).toBe(1)
+  })
+
+  test("should skip enforcement on various rate limit patterns", async () => {
+    const rateLimitMessages = [
+      "rate limit exceeded",
+      "Rate limit",
+      "rate_limit",
+      "too many requests",
+      "quota exceeded",
+      "Error 429",
+    ]
+
+    for (const msg of rateLimitMessages) {
+      promptCalls = []
+      toastCalls = []
+      setMainSession(undefined)
+      subagentSessions.clear()
+      const sessionID = `rate-limit-test-${msg.slice(0, 10)}`
+      setMainSession(sessionID)
+      const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+      await hook.handler({
+        event: { type: "session.error", properties: { sessionID, error: { message: msg } } },
+      })
+
+      await hook.handler({
+        event: { type: "session.idle", properties: { sessionID } },
+      })
+
+      await new Promise(r => setTimeout(r, 500))
+
+      expect(promptCalls.length).toBe(0)
+    }
+  })
 })
+

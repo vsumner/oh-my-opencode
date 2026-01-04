@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
+import { PERMISSION_READ_ONLY } from "./permission-constants"
 
 const DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
@@ -27,7 +28,7 @@ export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig
     mode: "subagent" as const,
     model,
     temperature: 0.1,
-    tools: { write: false, edit: false, background_task: false },
+    permission: PERMISSION_READ_ONLY,
     prompt: `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized open-source codebase understanding agent.
