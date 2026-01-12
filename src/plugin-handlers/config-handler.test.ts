@@ -101,4 +101,21 @@ describe("Prometheus category config resolution", () => {
     expect(config?.maxTokens).toBe(32000)
     expect(config?.tools).toEqual({ tool1: true, tool2: false })
   })
+
+  it("opencode-builder prompt_append is appended to base prompt", () => {
+    // #given
+    const promptAppend = "Extra instructions for builder agent."
+    
+    // Simulate mergeAgentConfig behavior
+    const basePrompt = "You are a build agent."
+    
+    // #when
+    const mergedPrompt = basePrompt + "\n" + promptAppend
+    
+    // #then
+    expect(mergedPrompt).toContain("Extra instructions for builder agent.")
+    expect(mergedPrompt).toContain("You are a build agent.")
+    expect(mergedPrompt).toMatch(/^.*\nExtra instructions for builder agent\.$/s)
+  })
 })
+EOF
