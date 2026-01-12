@@ -170,9 +170,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         };
 
         agentConfig["OpenCode-Builder"] = openCodeBuilderOverride
-          ? { ...openCodeBuilderBase, ...openCodeBuilderOverride }
-          : openCodeBuilderBase;
-      }
+        agentConfig["OpenCode-Builder"] = openCodeBuilderOverride          ? mergeAgentConfig(openCodeBuilderBase, openCodeBuilderOverride)          : openCodeBuilderBase;      }
 
       if (plannerEnabled) {
         const { name: _planName, mode: _planMode, ...planConfigWithoutName } =
