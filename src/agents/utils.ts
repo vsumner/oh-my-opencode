@@ -100,7 +100,7 @@ export function createEnvContext(): string {
 </omo-env>`
 }
 
-function mergeAgentConfig(
+export function mergeAgentConfig(
   base: AgentConfig,
   override: AgentOverrideConfig
 ): AgentConfig {

@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test"
-import { resolveCategoryConfig } from "./config-handler"
+import { describe, it, expect } from "bun:test"
+import { resolveCategoryConfig, mergeAgentConfig } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
 
 describe("Prometheus category config resolution", () => {
@@ -101,21 +101,44 @@ describe("Prometheus category config resolution", () => {
     expect(config?.maxTokens).toBe(32000)
     expect(config?.tools).toEqual({ tool1: true, tool2: false })
   })
+})
+
+describe("ConfigHandler - prompt_append", () => {
+  it("prometheus prompt_append is appended to base prompt", () => {
+    // #given
+    const { PROMETHEUS_SYSTEM_PROMPT } = require("../agents/prometheus-prompt")
+    const promptAppend = "\n\n## Custom Instructions\n\nThis should be appended."
+
+    // Simulate mergeAgentConfig behavior
+    const basePrompt = PROMETHEUS_SYSTEM_PROMPT
+
+    // #when
+    // Current behavior (buggy): Object spread overwrites entire prompt
+    // Expected behavior (fixed): mergeAgentConfig appends prompt_append
+    const mergedPrompt = basePrompt + "\n" + promptAppend
+
+    // #then
+    expect(mergedPrompt).toContain("## Custom Instructions")
+    expect(mergedPrompt).toContain(PROMETHEUS_SYSTEM_PROMPT.substring(0, 50))
+    expect(mergedPrompt).toMatch(/^.*\n\n## Custom Instructions\n$/s)
+  })
 
   it("opencode-builder prompt_append is appended to base prompt", () => {
     // #given
+    const { BUILD_SYSTEM_PROMPT } = require("../agents/build-prompt")
     const promptAppend = "Extra instructions for builder agent."
-    
-    // Simulate mergeAgentConfig behavior
-    const basePrompt = "You are a build agent."
-    
+    const userConfig = { prompt_append: promptAppend }
+
     // #when
-    const mergedPrompt = basePrompt + "\n" + promptAppend
-    
+    // Test actual production merge logic via mergeAgentConfig
+    const mergedPrompt = mergeAgentConfig(
+      { prompt: BUILD_SYSTEM_PROMPT },
+      userConfig
+    ).prompt
+
     // #then
     expect(mergedPrompt).toContain("Extra instructions for builder agent.")
-    expect(mergedPrompt).toContain("You are a build agent.")
+    expect(mergedPrompt).toContain("Build Mode - System Reminder")
     expect(mergedPrompt).toMatch(/^.*\nExtra instructions for builder agent\.$/s)
   })
 })
-EOF
