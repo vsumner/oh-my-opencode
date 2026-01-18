@@ -1,13 +1,13 @@
 import { join } from "node:path"
 import { getOpenCodeStorageDir } from "../../shared/data-path"
-import { getClaudeConfigDir } from "../../shared"
+import { CONFIG_PATHS } from "../../shared/config-path-resolver"
 
 export const OPENCODE_STORAGE = getOpenCodeStorageDir()
 export const MESSAGE_STORAGE = join(OPENCODE_STORAGE, "message")
 export const PART_STORAGE = join(OPENCODE_STORAGE, "part")
 export const SESSION_STORAGE = join(OPENCODE_STORAGE, "session")
-export const TODO_DIR = join(getClaudeConfigDir(), "todos")
-export const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
+export const TODO_DIR = CONFIG_PATHS.claudeTodos()
+export const TRANSCRIPT_DIR = CONFIG_PATHS.claudeTranscripts()
 export const SESSION_LIST_DESCRIPTION = `List all OpenCode sessions with optional filtering.
 
 Returns a list of available session IDs with metadata including message count, date range, and agents used.

@@ -1,9 +1,9 @@
 import { join } from "path"
 import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync } from "fs"
-import { getClaudeConfigDir } from "../../shared"
+import { CONFIG_PATHS } from "../../shared/config-path-resolver"
 import type { TodoFile, TodoItem, ClaudeCodeTodoItem } from "./types"
 
-const TODO_DIR = join(getClaudeConfigDir(), "todos")
+const TODO_DIR = CONFIG_PATHS.claudeTodos()
 
 export function getTodoPath(sessionId: string): string {
   return join(TODO_DIR, `${sessionId}-agent-${sessionId}.json`)

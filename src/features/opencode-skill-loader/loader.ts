@@ -5,7 +5,7 @@ import yaml from "js-yaml"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { CONFIG_PATHS } from "../../shared/config-path-resolver"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
@@ -175,7 +175,7 @@ function skillsToRecord(skills: LoadedSkill[]): Record<string, CommandDefinition
 }
 
 export async function loadUserSkills(): Promise<Record<string, CommandDefinition>> {
-  const userSkillsDir = join(getClaudeConfigDir(), "skills")
+  const userSkillsDir = CONFIG_PATHS.claudeSkills()
   const skills = await loadSkillsFromDir(userSkillsDir, "user")
   return skillsToRecord(skills)
 }
@@ -239,7 +239,7 @@ export async function getSkillByName(name: string, options: DiscoverSkillsOption
 }
 
 export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
-  const userSkillsDir = join(getClaudeConfigDir(), "skills")
+  const userSkillsDir = CONFIG_PATHS.claudeSkills()
   return loadSkillsFromDir(userSkillsDir, "user")
 }
 

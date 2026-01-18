@@ -4,7 +4,7 @@ import { homedir } from "os"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { CONFIG_PATHS } from "../../shared/config-path-resolver"
 import { log } from "../../shared/logger"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
 
@@ -110,7 +110,7 @@ function commandsToRecord(commands: LoadedCommand[]): Record<string, CommandDefi
 }
 
 export async function loadUserCommands(): Promise<Record<string, CommandDefinition>> {
-  const userCommandsDir = join(getClaudeConfigDir(), "commands")
+  const userCommandsDir = CONFIG_PATHS.claudeCommands()
   const commands = await loadCommandsFromDir(userCommandsDir, "user")
   return commandsToRecord(commands)
 }

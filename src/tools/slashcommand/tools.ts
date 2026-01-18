@@ -4,7 +4,7 @@ import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { CONFIG_PATHS } from "../../shared/config-path-resolver"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
 import type { CommandScope, CommandMetadata, CommandInfo, SlashcommandToolOptions } from "./types"
 
@@ -53,7 +53,7 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
 
 export function discoverCommandsSync(): CommandInfo[] {
   const { homedir } = require("os")
-  const userCommandsDir = join(getClaudeConfigDir(), "commands")
+  const userCommandsDir = CONFIG_PATHS.claudeCommands()
   const projectCommandsDir = join(process.cwd(), ".claude", "commands")
   const opencodeGlobalDir = join(homedir(), ".config", "opencode", "command")
   const opencodeProjectDir = join(process.cwd(), ".opencode", "command")

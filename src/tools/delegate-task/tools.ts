@@ -12,6 +12,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions } from "../../shared"
+import { formatDetailedError } from "../../shared/error-formatter"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -49,54 +50,6 @@ function formatDuration(start: Date, end?: Date): string {
   if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`
   if (minutes > 0) return `${minutes}m ${seconds % 60}s`
   return `${seconds}s`
-}
-
-interface ErrorContext {
-  operation: string
-  args?: DelegateTaskArgs
-  sessionID?: string
-  agent?: string
-  category?: string
-}
-
-function formatDetailedError(error: unknown, ctx: ErrorContext): string {
-  const message = error instanceof Error ? error.message : String(error)
-  const stack = error instanceof Error ? error.stack : undefined
-
-  const lines: string[] = [
-    `${ctx.operation} failed`,
-    "",
-    `**Error**: ${message}`,
-  ]
-
-  if (ctx.sessionID) {
-    lines.push(`**Session ID**: ${ctx.sessionID}`)
-  }
-
-  if (ctx.agent) {
-    lines.push(`**Agent**: ${ctx.agent}${ctx.category ? ` (category: ${ctx.category})` : ""}`)
-  }
-
-  if (ctx.args) {
-    lines.push("", "**Arguments**:")
-    lines.push(`- description: "${ctx.args.description}"`)
-    lines.push(`- category: ${ctx.args.category ?? "(none)"}`)
-    lines.push(`- subagent_type: ${ctx.args.subagent_type ?? "(none)"}`)
-    lines.push(`- run_in_background: ${ctx.args.run_in_background}`)
-    lines.push(`- skills: [${ctx.args.skills?.join(", ") ?? ""}]`)
-    if (ctx.args.resume) {
-      lines.push(`- resume: ${ctx.args.resume}`)
-    }
-  }
-
-  if (stack) {
-    lines.push("", "**Stack Trace**:")
-    lines.push("```")
-    lines.push(stack.split("\n").slice(0, 10).join("\n"))
-    lines.push("```")
-  }
-
-  return lines.join("\n")
 }
 
 type ToolContextWithMetadata = {

@@ -4,9 +4,9 @@ import { tmpdir } from "os"
 import { randomUUID } from "crypto"
 import type { TranscriptEntry } from "./types"
 import { transformToolName } from "../../shared/tool-name"
-import { getClaudeConfigDir } from "../../shared"
+import { CONFIG_PATHS } from "../../shared/config-path-resolver"
 
-const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
+const TRANSCRIPT_DIR = CONFIG_PATHS.claudeTranscripts()
 
 export function getTranscriptPath(sessionId: string): string {
   return join(TRANSCRIPT_DIR, `${sessionId}.jsonl`)
