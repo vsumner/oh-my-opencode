@@ -26,14 +26,6 @@ export interface FormatChangesOptions {
  */
 export function getGitDiffStats(directory: string): GitFileStat[] {
   try {
-    const output = execSync("git diff --numstat HEAD", {
-      cwd: directory,
-      encoding: "utf-8",
-      timeout: 5000,
-    }).trim()
-
-    if (!output) return []
-
     const statusOutput = execSync("git status --porcelain", {
       cwd: directory,
       encoding: "utf-8",
@@ -45,13 +37,56 @@ export function getGitDiffStats(directory: string): GitFileStat[] {
       if (!line) continue
       const status = line.substring(0, 2).trim()
       const filePath = line.substring(3)
-      if (status === "A" || status === "??") {
-        statusMap.set(filePath, "added")
-      } else if (status === "D") {
+      // Check for status codes indicating deleted files first (D, AD, MD, etc.)
+      // This must come before checking for "A" to correctly classify "AD" as deleted, not added
+      if (status.includes("D")) {
         statusMap.set(filePath, "deleted")
+      } else if (status.includes("A") || status.includes("?")) {
+        statusMap.set(filePath, "added")
       } else {
         statusMap.set(filePath, "modified")
       }
+    }
+
+    const output = execSync("git diff --numstat HEAD", {
+      cwd: directory,
+      encoding: "utf-8",
+      timeout: 5000,
+    }).trim()
+
+    if (!output) {
+      // No tracked changes, but there might be untracked files
+      const untrackedFiles = statusOutput.split("\n").filter((line) =>
+        line.trim().startsWith("??")
+      )
+      const stats: GitFileStat[] = []
+      for (const line of untrackedFiles) {
+        const filePath = line.substring(3)
+        try {
+          // Get line count for untracked files (since they have no diff)
+          const linesOutput = execSync(`wc -l "${filePath}"`, {
+            cwd: directory,
+            encoding: "utf-8",
+            timeout: 5000,
+          }).trim()
+          const lines = parseInt(linesOutput.split(/\s+/)[0], 10)
+          stats.push({
+            path: filePath,
+            added: lines || 0,
+            removed: 0,
+            status: "added",
+          })
+        } catch {
+          // If wc fails, just add the file without line count
+          stats.push({
+            path: filePath,
+            added: 0,
+            removed: 0,
+            status: "added",
+          })
+        }
+      }
+      return stats
     }
 
     const stats: GitFileStat[] = []
@@ -118,7 +153,7 @@ export function formatFileChanges(stats: GitFileStat[], notepadPath?: string): s
   }
 
   if (notepadPath) {
-    const notepadStat = stats.find((s) => s.path.includes("notepad") || s.path.includes(".sisyphus"))
+    const notepadStat = stats.find((s) => s.path === notepadPath || s.path.includes(notepadPath))
     if (notepadStat) {
       lines.push("[NOTEPAD UPDATED]")
       lines.push(`  ${notepadStat.path}  (+${notepadStat.added})`)

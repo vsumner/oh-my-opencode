@@ -187,7 +187,12 @@ export function formatToolError(
  */
 function formatArguments(args: unknown, lines: string[]): void {
   if (typeof args !== "object" || args === null) {
-    lines.push(`- args: ${JSON.stringify(args)}`)
+    try {
+      lines.push(`- args: ${JSON.stringify(args)}`)
+    } catch (error) {
+      // Handle circular references, BigInt, or other non-stringifiable values
+      lines.push(`- args: <${String(args)}>`)
+    }
     return
   }
 
@@ -210,8 +215,17 @@ function formatArguments(args: unknown, lines: string[]): void {
 
   // Generic argument formatting
   for (const [key, value] of Object.entries(argObj)) {
-    const valueStr =
-      typeof value === "string" ? value : JSON.stringify(value, null, 2)
+    let valueStr: string
+    if (typeof value === "string") {
+      valueStr = value
+    } else {
+      try {
+        valueStr = JSON.stringify(value, null, 2)
+      } catch {
+        // Handle circular references, BigInt, or other non-stringifiable values
+        valueStr = String(value)
+      }
+    }
     lines.push(`- ${key}: ${valueStr}`)
   }
 }
