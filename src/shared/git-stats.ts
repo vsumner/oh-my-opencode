@@ -1,4 +1,6 @@
 import { execSync } from "node:child_process"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 /**
  * Represents file change statistics from git.
@@ -18,6 +20,55 @@ export interface FormatChangesOptions {
 }
 
 /**
+ * Parses git status line and returns the file status.
+ */
+function parseFileStatus(line: string): "modified" | "added" | "deleted" {
+  const status = line.substring(0, 2).trim()
+  if (status.includes("D")) return "deleted"
+  if (status.includes("A") || status.includes("?")) return "added"
+  return "modified"
+}
+
+/**
+ * Gets line count for an untracked file.
+ * Reads file directly to avoid command injection risks.
+ */
+function getUntrackedFileLines(filePath: string, directory: string): number {
+  try {
+    const fullPath = join(directory, filePath)
+    const content = readFileSync(fullPath, "utf-8")
+    // Count newlines, handle files with/without trailing newline
+    const newlineCount = content.split("\n").length - 1
+    return newlineCount >= 0 ? newlineCount : 0
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Processes untracked files and returns their stats.
+ */
+function processUntrackedFiles(
+  statusOutput: string,
+  directory: string
+): GitFileStat[] {
+  const untrackedLines = statusOutput.split("\n").filter((line) =>
+    line.trim().startsWith("??")
+  )
+
+  return untrackedLines.map((line) => {
+    const filePath = line.substring(3)
+    const lines = getUntrackedFileLines(filePath, directory)
+    return {
+      path: filePath,
+      added: lines,
+      removed: 0,
+      status: "added" as const,
+    }
+  })
+}
+
+/**
  * Gets git diff statistics for the specified directory.
  * Returns an empty array if git is not available or no changes exist.
  *
@@ -32,65 +83,22 @@ export function getGitDiffStats(directory: string): GitFileStat[] {
       timeout: 5000,
     }).trim()
 
+    // Build status map from git status
     const statusMap = new Map<string, "modified" | "added" | "deleted">()
     for (const line of statusOutput.split("\n")) {
       if (!line) continue
-      const status = line.substring(0, 2).trim()
       const filePath = line.substring(3)
-      // Check for status codes indicating deleted files first (D, AD, MD, etc.)
-      // This must come before checking for "A" to correctly classify "AD" as deleted, not added
-      if (status.includes("D")) {
-        statusMap.set(filePath, "deleted")
-      } else if (status.includes("A") || status.includes("?")) {
-        statusMap.set(filePath, "added")
-      } else {
-        statusMap.set(filePath, "modified")
-      }
+      statusMap.set(filePath, parseFileStatus(line))
     }
 
-    const output = execSync("git diff --numstat HEAD", {
+    const diffOutput = execSync("git diff --numstat HEAD", {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
     }).trim()
 
-    if (!output) {
-      // No tracked changes, but there might be untracked files
-      const untrackedFiles = statusOutput.split("\n").filter((line) =>
-        line.trim().startsWith("??")
-      )
-      const stats: GitFileStat[] = []
-      for (const line of untrackedFiles) {
-        const filePath = line.substring(3)
-        try {
-          // Get line count for untracked files (since they have no diff)
-          const linesOutput = execSync(`wc -l "${filePath}"`, {
-            cwd: directory,
-            encoding: "utf-8",
-            timeout: 5000,
-          }).trim()
-          const lines = parseInt(linesOutput.split(/\s+/)[0], 10)
-          stats.push({
-            path: filePath,
-            added: lines || 0,
-            removed: 0,
-            status: "added",
-          })
-        } catch {
-          // If wc fails, just add the file without line count
-          stats.push({
-            path: filePath,
-            added: 0,
-            removed: 0,
-            status: "added",
-          })
-        }
-      }
-      return stats
-    }
-
     const stats: GitFileStat[] = []
-    for (const line of output.split("\n")) {
+    for (const line of diffOutput.split("\n")) {
       const parts = line.split("\t")
       if (parts.length < 3) continue
 
@@ -106,7 +114,9 @@ export function getGitDiffStats(directory: string): GitFileStat[] {
       })
     }
 
-    return stats
+    // Always include untracked files, even when tracked changes exist
+    const untrackedStats = processUntrackedFiles(statusOutput, directory)
+    return stats.concat(untrackedStats)
   } catch {
     return []
   }
