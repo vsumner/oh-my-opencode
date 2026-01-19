@@ -69,15 +69,17 @@ export function createAgentFactory(options: AgentFactoryOptions): (model?: strin
       ...extra,
     }
 
+    const effectiveModel = config.model ?? resolvedModel
+
     // Apply tool restrictions or allowlist
     config = applyToolRestrictions(config, restrictedTools, allowedTools)
 
     // Apply model-specific configuration
-    if (isGptModel(resolvedModel)) {
+    if (isGptModel(effectiveModel)) {
       if (reasoningEffort) {
         config = { ...config, reasoningEffort }
       }
-    } else if (isClaudeModel(resolvedModel)) {
+    } else if (isClaudeModel(effectiveModel)) {
       // Apply thinking configuration for Claude models only
       if (thinking) {
         config = { ...config, thinking }
