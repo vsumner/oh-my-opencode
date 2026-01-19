@@ -219,7 +219,7 @@ I will use delegate_task with:
 
 delegate_task(
   agent="explore",
-  background=true,
+  run_in_background=true,
   prompt="Find all authentication implementations in the codebase"
 )
 \`\`\`
