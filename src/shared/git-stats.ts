@@ -66,6 +66,14 @@ function getUntrackedFileLines(filePath: string, directory: string): number {
 /**
  * Processes untracked files and returns their stats.
  */
+function parsePorcelainPath(rawPath: string): string {
+  const trimmed = rawPath.trim()
+  if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+    return trimmed.slice(1, -1).replace(/\\\\/g, "\\").replace(/\\\"/g, "\"")
+  }
+  return trimmed
+}
+
 function processUntrackedFiles(
   statusOutput: string,
   directory: string
@@ -75,7 +83,7 @@ function processUntrackedFiles(
   )
 
   return untrackedLines.map((line) => {
-    const filePath = line.substring(3)
+    const filePath = parsePorcelainPath(line.substring(3))
     const lines = getUntrackedFileLines(filePath, directory)
     return {
       path: filePath,
@@ -110,7 +118,8 @@ export function getGitDiffStats(directory: string): GitFileStat[] {
       // For tracked files: status at index 0, path at index 2
       // For untracked files: path at index 3
       const pathStart = trimmed.startsWith("??") ? 3 : 2
-      const path = trimmed.substring(pathStart)
+      const rawPath = trimmed.substring(pathStart)
+      const path = parsePorcelainPath(rawPath)
       const status = parseFileStatus(line)
       statusMap.set(path, status)
     }

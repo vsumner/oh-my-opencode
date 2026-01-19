@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { execSync } from "node:child_process"
 import { getGitDiffStats, formatFileChanges, type GitFileStat } from "./git-stats"
 
 describe("getGitDiffStats", () => {
-  const testDir = join(__dirname, ".test-git-stats")
+  const createTestDir = () => join(tmpdir(), `git-stats-${Date.now()}-${Math.random().toString(16).slice(2)}`)
 
   test("returns empty array when git is not available", () => {
     //#given
@@ -20,6 +21,7 @@ describe("getGitDiffStats", () => {
 
   test("returns empty array when no changes exist", () => {
     //#given
+    const testDir = createTestDir()
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     execSync("git init", { cwd: testDir, stdio: "ignore" })
     execSync("git config user.email 'test@example.com'", { cwd: testDir, stdio: "ignore" })
@@ -37,6 +39,7 @@ describe("getGitDiffStats", () => {
 
   test("returns stats for modified files", () => {
     //#given
+    const testDir = createTestDir()
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     execSync("git init", { cwd: testDir, stdio: "ignore" })
     execSync("git config user.email 'test@example.com'", { cwd: testDir, stdio: "ignore" })
@@ -62,6 +65,7 @@ describe("getGitDiffStats", () => {
 
   test("returns stats for added files", () => {
     //#given
+    const testDir = createTestDir()
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     execSync("git init", { cwd: testDir, stdio: "ignore" })
     execSync("git config user.email 'test@example.com'", { cwd: testDir, stdio: "ignore" })
@@ -85,6 +89,7 @@ describe("getGitDiffStats", () => {
 
   test("includes untracked files (??) in stats", () => {
     //#given
+    const testDir = createTestDir()
     if (!existsSync(testDir)) mkdirSync(testDir, { recursive: true })
     execSync("git init", { cwd: testDir, stdio: "ignore" })
     execSync("git config user.email 'test@example.com'", { cwd: testDir, stdio: "ignore" })
