@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createClaudeAgentFactory } from "./utils/factory"
 
 const DEFAULT_MODEL = "google/gemini-3-pro-preview"
 
@@ -19,18 +19,7 @@ export const FRONTEND_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createFrontendUiUxEngineerAgent(
-  model: string = DEFAULT_MODEL
-): AgentConfig {
-  const restrictions = createAgentToolRestrictions([])
-
-  return {
-    description:
-      "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire.",
-    mode: "subagent" as const,
-    model,
-    ...restrictions,
-    prompt: `# Role: Designer-Turned-Developer
+const FRONTEND_PROMPT = `# Role: Designer-Turned-Developer
 
 You are a designer who learned to code. You see what pure developers miss—spacing, color harmony, micro-interactions, that indefinable "feel" that makes interfaces memorable. Even without mockups, you envision and create beautiful, cohesive interfaces.
 
@@ -97,13 +86,14 @@ Create atmosphere and depth—gradient meshes, noise textures, geometric pattern
 ---
 
 # Execution
+`
 
-Match implementation complexity to aesthetic vision:
-- **Maximalist** → Elaborate code with extensive animations and effects
-- **Minimalist** → Restraint, precision, careful spacing and typography
-
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.`,
-  }
-}
+export const createFrontendUiUxEngineerAgent = createClaudeAgentFactory({
+  description:
+    "A designer-turned-developer who crafts stunning UI/UX even without design mockups. Code may be a bit messy, but the visual output is always fire.",
+  mode: "subagent",
+  defaultModel: DEFAULT_MODEL,
+  prompt: FRONTEND_PROMPT,
+})
 
 export const frontendUiUxEngineerAgent = createFrontendUiUxEngineerAgent()

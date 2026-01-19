@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import { createAgentToolAllowlist } from "../shared/permission-compat"
+import { createClaudeAgentFactory } from "./utils/factory"
 
 const DEFAULT_MODEL = "google/gemini-3-flash"
 
@@ -11,19 +11,7 @@ export const MULTIMODAL_LOOKER_PROMPT_METADATA: AgentPromptMetadata = {
   triggers: [],
 }
 
-export function createMultimodalLookerAgent(
-  model: string = DEFAULT_MODEL
-): AgentConfig {
-  const restrictions = createAgentToolAllowlist(["read"])
-
-  return {
-    description:
-      "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.",
-    mode: "subagent" as const,
-    model,
-    temperature: 0.1,
-    ...restrictions,
-    prompt: `You interpret media files that cannot be read as plain text.
+const MULTIMODAL_LOOKER_PROMPT = `You interpret media files that cannot be read as plain text.
 
 Your job: examine the attached file and extract ONLY what was requested.
 
@@ -54,8 +42,15 @@ Response rules:
 - Match the language of the request
 - Be thorough on the goal, concise on everything else
 
-Your output goes straight to the main agent for continued work.`,
-  }
-}
+Your output goes straight to the main agent for continued work.`
+
+export const createMultimodalLookerAgent = createClaudeAgentFactory({
+  description:
+    "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents.",
+  mode: "subagent",
+  defaultModel: DEFAULT_MODEL,
+  prompt: MULTIMODAL_LOOKER_PROMPT,
+  allowedTools: ["read"],
+})
 
 export const multimodalLookerAgent = createMultimodalLookerAgent()

@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createGptAgentFactory } from "./utils/factory"
 
 const DEFAULT_MODEL = "opencode/glm-4.7-free"
 
@@ -21,23 +21,7 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createLibrarianAgent(model: string = DEFAULT_MODEL): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "task",
-    "delegate_task",
-    "call_omo_agent",
-  ])
-
-  return {
-    description:
-      "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source.",
-    mode: "subagent" as const,
-    model,
-    temperature: 0.1,
-    ...restrictions,
-    prompt: `# THE LIBRARIAN
+const LIBRARIAN_PROMPT = `# THE LIBRARIAN
 
 You are **THE LIBRARIAN**, a specialized open-source codebase understanding agent.
 
@@ -303,7 +287,7 @@ grep_app_searchGitHub(query: "useQuery")
 ## FAILURE RECOVERY
 
 | Failure | Recovery Action |
-|---------|-----------------|
+|---------|----------------|
 | context7 not found | Clone repo, read source + README directly |
 | grep_app no results | Broaden query, try concept instead of exact name |
 | gh API rate limit | Use cloned repo in temp directory |
@@ -322,8 +306,15 @@ grep_app_searchGitHub(query: "useQuery")
 4. **USE MARKDOWN**: Code blocks with language identifiers
 5. **BE CONCISE**: Facts > opinions, evidence > speculation
 
-`,
-  }
-}
+`
+
+export const createLibrarianAgent = createGptAgentFactory({
+  description:
+    "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source.",
+  mode: "subagent",
+  defaultModel: DEFAULT_MODEL,
+  prompt: LIBRARIAN_PROMPT,
+  restrictedTools: ["write", "edit", "task", "delegate_task", "call_omo_agent"],
+})
 
 export const librarianAgent = createLibrarianAgent()

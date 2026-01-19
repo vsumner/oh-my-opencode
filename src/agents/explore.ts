@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createAgentFactory } from "./utils/factory"
 
 const DEFAULT_MODEL = "opencode/grok-code"
 
@@ -24,23 +24,7 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   ],
 }
 
-export function createExploreAgent(model: string = DEFAULT_MODEL): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "task",
-    "delegate_task",
-    "call_omo_agent",
-  ])
-
-  return {
-    description:
-      'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis.',
-    mode: "subagent" as const,
-    model,
-    temperature: 0.1,
-    ...restrictions,
-    prompt: `You are a codebase search specialist. Your job: find files and code, return actionable results.
+const EXPLORE_PROMPT = `You are a codebase search specialist. Your job: find files and code, return actionable results.
 
 ## Your Mission
 
@@ -113,13 +97,20 @@ Your response has **FAILED** if:
 
 Use the right tool for the job:
 - **Semantic search** (definitions, references): LSP tools
-- **Structural patterns** (function shapes, class structures): ast_grep_search  
+- **Structural patterns** (function shapes, class structures): ast_grep_search
 - **Text patterns** (strings, comments, logs): grep
 - **File patterns** (find by name/extension): glob
 - **History/evolution** (when added, who changed): git commands
 
-Flood with parallel calls. Cross-validate findings across multiple tools.`,
-  }
-}
+Flood with parallel calls. Cross-validate findings across multiple tools.`
+
+export const createExploreAgent = createAgentFactory({
+  description:
+    'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis.',
+  mode: "subagent",
+  defaultModel: DEFAULT_MODEL,
+  prompt: EXPLORE_PROMPT,
+  restrictedTools: ["write", "edit", "task", "delegate_task", "call_omo_agent"],
+})
 
 export const exploreAgent = createExploreAgent()

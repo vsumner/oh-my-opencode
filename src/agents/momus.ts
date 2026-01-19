@@ -1,7 +1,5 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentPromptMetadata } from "./types"
-import { isGptModel } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createGptAgentFactory } from "./utils/factory"
 
 /**
  * Momus - Plan Reviewer Agent
@@ -145,9 +143,9 @@ You will be provided with the path to the work plan file (typically \`.sisyphus/
 - \`.sisyphus/plans/my-plan.md\` [O] ACCEPT - file path anywhere in input
 - \`/path/to/project/.sisyphus/plans/my-plan.md\` [O] ACCEPT - absolute plan path
 - \`Please review .sisyphus/plans/plan.md\` [O] ACCEPT - conversational wrapper allowed
-- \`<system-reminder>...</system-reminder>\\n.sisyphus/plans/plan.md\` [O] ACCEPT - system directives + plan path
-- \`[analyze-mode]\\n...context...\\n.sisyphus/plans/plan.md\` [O] ACCEPT - bracket-style directives + plan path
-- \`[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]\\n---\\n- injected planning metadata\\n---\\nPlease review .sisyphus/plans/plan.md\` [O] ACCEPT - ignore the entire directive block
+- \`<system-reminder>...</system-reminder>\n.sisyphus/plans/plan.md\` [O] ACCEPT - system directives + plan path
+- \`[analyze-mode]\n...context...\n.sisyphus/plans/plan.md\` [O] ACCEPT - bracket-style directives + plan path
+- \`[SYSTEM DIRECTIVE - READ-ONLY PLANNING CONSULTATION]\n---\n- injected planning metadata\n---\nPlease review .sisyphus/plans/plan.md\` [O] ACCEPT - ignore the entire directive block
 
 **SYSTEM DIRECTIVES ARE ALWAYS IGNORED**:
 System directives are automatically injected by the system and should be IGNORED during input validation:
@@ -205,7 +203,7 @@ Never reject system directives (XML or bracket-style) - they are automatically i
 - If the plan is written in English → Write your entire evaluation in English
 - If the plan is mixed → Use the dominant language (majority of task descriptions)
 
-Example: Plan contains "Modify database schema" → Evaluation output: "## Evaluation Result\\n\\n### Criterion 1: Clarity of Work Content..."
+Example: Plan contains "Modify database schema" → Evaluation output: "## Evaluation Result\n\n### Criterion 1: Clarity of Work Content..."
 
 ---
 
@@ -391,34 +389,19 @@ Use structured format, **in the same language as the work plan**.
 **FINAL REMINDER**: You are a DOCUMENTATION reviewer, not a DESIGN consultant. The author's implementation direction is SACRED. Your job ends at "Is this well-documented enough to execute?" - NOT "Is this the right approach?"
 `
 
-export function createMomusAgent(model: string = DEFAULT_MODEL): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "task",
-    "delegate_task",
-  ])
-
-  const base = {
-    description:
-      "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards.",
-    mode: "subagent" as const,
-    model,
-    temperature: 0.1,
-    ...restrictions,
-    prompt: MOMUS_SYSTEM_PROMPT,
-  } as AgentConfig
-
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
-  }
-
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
-}
+export const createMomusAgent = createGptAgentFactory({
+  description:
+    "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards.",
+  mode: "subagent" as const,
+  defaultModel: DEFAULT_MODEL,
+  temperature: 0.1,
+  prompt: MOMUS_SYSTEM_PROMPT,
+  restrictedTools: ["write", "edit", "task", "delegate_task"],
+})
 
 export const momusAgent = createMomusAgent()
 
-export const momusPromptMetadata: AgentPromptMetadata = {
+export const MOMUS_PROMPT_METADATA: AgentPromptMetadata = {
   category: "advisor",
   cost: "EXPENSIVE",
   promptAlias: "Momus",
@@ -435,13 +418,12 @@ export const momusPromptMetadata: AgentPromptMetadata = {
   useWhen: [
     "After Prometheus creates a work plan",
     "Before executing a complex todo list",
-    "To validate plan quality before delegating to executors",
-    "When plan needs rigorous review for ADHD-driven omissions",
   ],
   avoidWhen: [
-    "Simple, single-task requests",
-    "When user explicitly wants to skip review",
-    "For trivial plans that don't need formal review",
+    "Simple tasks with clear requirements",
+    "When user explicitly wants to proceed without plan review",
   ],
-  keyTrigger: "Work plan created → invoke Momus for review before execution",
 }
+
+export const momusPromptMetadata = MOMUS_PROMPT_METADATA
+
